@@ -41,6 +41,7 @@ export class GameWindow {
     fISinArray: Array<number> = []
     fICosArray: Array<number> = []
     fITanArray: Array<number> = []
+    fFishTable: Array<number> = []
 
     // Step array
     fXStepTable: Array<number> = []
@@ -49,8 +50,8 @@ export class GameWindow {
     // Player
     fPlayerX: number = 256;
     fPlayerY: number = 256;
-    fPlayerDeg: number = this.ANGLE_5_DEG;
-    fPlayerSpeed: number = 6;
+    fPlayerDeg: number = this.ANGLE_360_DEG;
+    fPlayerSpeed: number = 5;
     fKeyUp: boolean = false;
     fKeyDown: boolean = false;
     fKeyLeft: boolean = false;
@@ -79,19 +80,32 @@ export class GameWindow {
         this.fISinArray = new Array(this.ANGLE_360_DEG + 1)
         this.fCosArray = new Array(this.ANGLE_360_DEG + 1)
         this.fITanArray = new Array(this.ANGLE_360_DEG + 1)
+        this.fFishTable = new Array(this.ANGLE_60_DEG + 1)
         this.fXStepTable = new Array(this.ANGLE_360_DEG + 1)
         this.fYStepTable = new Array(this.ANGLE_360_DEG + 1)
 
         for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
             // TODO : 
-            const rad = this.degToRad(i) + 0.001
+            const rad = this.degToRad(i) + (0.0001)
             // const rad = this.degToRad(i)
             this.fSinArray[i] = Math.sin(rad)
             this.fCosArray[i] = Math.cos(rad)
             this.fTanArray[i] = Math.tan(rad)
-            this.fISinArray[i] = 1 / this.fSinArray[i]
-            this.fICosArray[i] = 1 / this.fCosArray[i]
-            this.fITanArray[i] = 1 / this.fTanArray[i]
+            this.fISinArray[i] = 1.0 / this.fSinArray[i]
+            this.fICosArray[i] = 1.0 / this.fCosArray[i]
+            this.fITanArray[i] = 1.0 / this.fTanArray[i]
+
+            if (i >= this.ANGLE_90_DEG && i < this.ANGLE_270_DEG) {
+                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
+                if (this.fXStepTable[i] > 0) {
+                    this.fXStepTable[i] = -this.fXStepTable[i]
+                }
+            } else {
+                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
+                if (this.fXStepTable[i] < 0) {
+                    this.fXStepTable[i] = -this.fXStepTable[i]
+                }
+            }
 
             if (i >= this.ANGLE_0_DEG && i < this.ANGLE_180_DEG) {
                 this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE
@@ -105,20 +119,14 @@ export class GameWindow {
                 }
             }
 
-            if (i <= this.ANGLE_90_DEG || i > this.ANGLE_270_DEG) {
-                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
-                if (this.fXStepTable[i] < 0) {
-                    this.fXStepTable[i] = -this.fXStepTable[i]
-                }
-            } else {
-                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
-                if (this.fXStepTable[i] > 0) {
-                    this.fXStepTable[i] = -this.fXStepTable[i]
-                }
-            }
         }
 
-        this.fPlayerDistToProjectionPlane = (this.HALF_WIDTH) * this.fTanArray[this.ANGLE_30_DEG]
+        for (let i = -this.ANGLE_30_DEG; i <= this.ANGLE_30_DEG; ++i) {
+            const rad = this.degToRad(i)
+            this.fFishTable[i + this.ANGLE_30_DEG] = 1.0 / Math.cos(rad)
+        }
+
+        this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG])
 
         // Recalculate Offset
         this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2)
@@ -126,10 +134,9 @@ export class GameWindow {
             "111111111111" +
             "100000000001" +
             "100000000001" +
-            "100001100001" +
-            "100001100001" +
+            "100011000001" +
+            "100000000011" +
             "100000000001" +
-
             "100000000001" +
             "100000000001" +
             "100001000001" +
@@ -197,12 +204,11 @@ export class GameWindow {
         let distToNextVerticalWall
         let distToNextHorizontalWall
 
-        const inc = this.ANGLE_60_DEG / this.WIDTH
         let curDeg = this.fPlayerDeg - this.ANGLE_30_DEG
         if (curDeg < 0) {
             curDeg = this.ANGLE_360_DEG + curDeg
         }
-        for (let i = 0; i < this.WIDTH; i += 1) {
+        for (let currentColumn = 0; currentColumn < this.WIDTH; currentColumn += 1) {
             // Vertical
             if (curDeg < this.ANGLE_90_DEG || curDeg > this.ANGLE_270_DEG) {
                 // Right
@@ -213,36 +219,43 @@ export class GameWindow {
             } else {
                 // Left
                 verticalGridPosition = Math.floor(this.fPlayerX / this.TILE_SIZE) * this.TILE_SIZE
-                --verticalGridPosition
                 let yTemp = (verticalGridPosition - this.fPlayerX) * this.fTanArray[curDeg]
                 yIntersection = this.fPlayerY + yTemp
                 distToNextVerticalGrid = -this.TILE_SIZE
+
+                --verticalGridPosition
             }
-            let distToNextYIntersection = this.fYStepTable[curDeg]
-            while (true) {
-                let xGridIndex = Math.floor((verticalGridPosition) / this.TILE_SIZE)
-                let yGridIndex = Math.floor(yIntersection / this.TILE_SIZE)
-                let mapIdx = Math.floor(yGridIndex * this.mapWidth + xGridIndex)
 
-                if (xGridIndex >= this.mapWidth
-                    || yGridIndex >= this.mapHeight
-                    || xGridIndex < 0
-                    || yGridIndex < 0) {
-                    distToNextVerticalWall = Number.MAX_VALUE
-                    break
+            if (curDeg === this.ANGLE_90_DEG || curDeg === this.ANGLE_270_DEG) {
+                distToNextVerticalWall = Number.MAX_VALUE
+            } else {
+                let distToNextYIntersection = this.fYStepTable[curDeg]
+                while (true) {
+                    let xGridIndex = Math.floor((verticalGridPosition) / this.TILE_SIZE)
+                    let yGridIndex = Math.floor(yIntersection / this.TILE_SIZE)
+                    let mapIdx = Math.floor(yGridIndex * this.mapWidth + xGridIndex)
+
+                    if (xGridIndex >= this.mapWidth
+                        || yGridIndex >= this.mapHeight
+                        || xGridIndex < 0
+                        || yGridIndex < 0) {
+                        distToNextVerticalWall = Number.MAX_VALUE
+                        break
+                    }
+
+                    else if (this.map.charAt(mapIdx) !== '0') {
+                        distToNextVerticalWall = (yIntersection - this.fPlayerY) * (this.fISinArray[curDeg])
+                        break
+                    } else {
+                        verticalGridPosition += distToNextVerticalGrid;
+                        yIntersection += distToNextYIntersection;
+                    }
+
                 }
-
-                if (this.map.charAt(mapIdx) !== '0') {
-                    distToNextVerticalWall = (yIntersection - this.fPlayerY) * this.fISinArray[curDeg]
-                    break
-                }
-
-                verticalGridPosition += distToNextVerticalGrid;
-                yIntersection += distToNextYIntersection;
             }
 
             // Horizontal
-            if (curDeg >= this.ANGLE_0_DEG && curDeg < this.ANGLE_180_DEG) {
+            if (curDeg > this.ANGLE_0_DEG && curDeg < this.ANGLE_180_DEG) {
                 // Bottom
                 horizontalGridPosition = this.TILE_SIZE + Math.floor(this.fPlayerY / this.TILE_SIZE) * this.TILE_SIZE
                 let xTemp = (horizontalGridPosition - this.fPlayerY) * this.fITanArray[curDeg]
@@ -251,61 +264,64 @@ export class GameWindow {
             } else {
                 // Top
                 horizontalGridPosition = Math.floor(this.fPlayerY / this.TILE_SIZE) * this.TILE_SIZE
-                --horizontalGridPosition
                 let xTemp = (horizontalGridPosition - this.fPlayerY) * this.fITanArray[curDeg]
                 xIntersection = this.fPlayerX + xTemp
                 distToNextHorizontalGrid = -this.TILE_SIZE
+                --horizontalGridPosition
             }
 
-            let distToNextXIntersection = this.fXStepTable[curDeg]
-            while (true) {
-                let xGridIndex = Math.floor(xIntersection / this.TILE_SIZE)
-                let yGridIndex = Math.floor((horizontalGridPosition) / this.TILE_SIZE)
-                let mapIdx = Math.floor(yGridIndex * this.mapWidth + xGridIndex)
 
-                if (xGridIndex >= this.mapWidth
-                    || yGridIndex >= this.mapHeight
-                    || xGridIndex < 0
-                    || yGridIndex < 0) {
-                    distToNextHorizontalWall = Number.MAX_VALUE
-                    break
+            if (curDeg === this.ANGLE_0_DEG || curDeg === this.ANGLE_180_DEG) {
+                distToNextHorizontalWall = Number.MAX_VALUE
+            } else {
+                let distToNextXIntersection = this.fXStepTable[curDeg]
+                while (true) {
+                    let xGridIndex = Math.floor(xIntersection / this.TILE_SIZE)
+                    let yGridIndex = Math.floor((horizontalGridPosition) / this.TILE_SIZE)
+                    let mapIdx = Math.floor(yGridIndex * this.mapWidth + xGridIndex)
+
+                    if (xGridIndex >= this.mapWidth
+                        || yGridIndex >= this.mapHeight
+                        || xGridIndex < 0
+                        || yGridIndex < 0) {
+                        distToNextHorizontalWall = Number.MAX_VALUE
+                        break
+                    }
+
+                    else if (this.map.charAt(mapIdx) !== '0') {
+                        distToNextHorizontalWall = (xIntersection - this.fPlayerX) * this.fICosArray[curDeg]
+                        break
+                    } else {
+                        horizontalGridPosition += distToNextHorizontalGrid;
+                        xIntersection += distToNextXIntersection;
+                    }
+
                 }
-
-                if (this.map.charAt(mapIdx) !== '0') {
-                    distToNextHorizontalWall = (horizontalGridPosition - this.fPlayerY) * this.fISinArray[curDeg]
-                    break
-                }
-
-                horizontalGridPosition += distToNextHorizontalGrid;
-                xIntersection += distToNextXIntersection;
             }
-            let xEndRay
-            let yEndRay
+
             let distToNextWall;
             if (distToNextVerticalWall < distToNextHorizontalWall) {
-                xEndRay = verticalGridPosition
-                yEndRay = yIntersection
                 distToNextWall = distToNextVerticalWall
+                this.drawRayCast(verticalGridPosition, yIntersection, 'cyan')
             } else {
-                xEndRay = xIntersection
-                yEndRay = horizontalGridPosition
                 distToNextWall = distToNextHorizontalWall
+                this.drawRayCast(xIntersection, horizontalGridPosition, 'cyan')
             }
             // Compute the height based on the distance of the ray
-            const wallHeight = (this.fPlayerDistToProjectionPlane * (this.TILE_SIZE/distToNextWall))
-            this.drawWall(wallHeight, i)
+            distToNextWall /= this.fFishTable[currentColumn]
+            const wallHeight = this.fPlayerDistToProjectionPlane * this.TILE_SIZE / distToNextWall
+            let topWall = this.HALF_HEIGHT - (wallHeight / 2)
+            if (topWall < 0) topWall = 0
+            let bottomWall = this.HALF_HEIGHT + (wallHeight / 2)
+            if (bottomWall >= this.HEIGHT) bottomWall = this.HEIGHT - 1
+            this.drawWall(topWall, bottomWall, currentColumn, ('#fb7eff'))
 
-            this.drawRayCast(xEndRay, yEndRay, 'cyan')
-            curDeg += inc;
-            if (curDeg > this.ANGLE_360_DEG) curDeg = curDeg - this.ANGLE_360_DEG
+            curDeg += 1;
+            if (curDeg >= this.ANGLE_360_DEG) curDeg = curDeg - this.ANGLE_360_DEG
         }
     }
-    drawWall(wallHeight: number, idx: number) {
-        const xStart = idx + this.windowOffset
-        const yStart = this.HALF_HEIGHT - (wallHeight / 2)
-        const xEnd = xStart
-        const yEnd = yStart + wallHeight
-        this.drawLine(xStart, yStart, xEnd, yEnd, '#fb7eff')
+    drawWall(topWall: number, bottomWall: number, idx: number, color: string) {
+        this.drawRect(idx + this.windowOffset, topWall, 1, (bottomWall - topWall), color)
     }
     drawRayCast(x: number, y: number, color: string) {
         this.drawLine(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE), ((y * this.miniMapWidth) / this.TILE_SIZE), color)
@@ -354,7 +370,7 @@ export class GameWindow {
         this.currentTimeStamp = currentTimeStamp;
     }
     degToRad(deg: number) {
-        return deg * (Math.PI / this.ANGLE_180_DEG)
+        return (deg * Math.PI) / this.ANGLE_180_DEG
     }
     drawFPS() {
         this.ctx.beginPath()
@@ -373,10 +389,7 @@ export class GameWindow {
                 } else {
                 }
                 this.ctx.beginPath()
-                this.ctx.strokeStyle = color
                 this.drawRect(col * this.miniMapWidth, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth, color)
-                // this.ctx.strokeRect(col * this.miniMapWidth + this.windowOffset, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth)
-                // this.ctx.stroke()
             }
         }
     }
