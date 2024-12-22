@@ -2,10 +2,10 @@ let debug = false;
 export class GameWindow {
     // Canvas
     ctx: CanvasRenderingContext2D;
-    WIDTH: number = 900;
-    HEIGHT: number = 660;
+    WIDTH: number = 960;
+    HEIGHT: number = 656;
     HALF_WIDTH: number = this.WIDTH / 2
-
+    HALF_HEIGHT: number = this.HEIGHT / 2
 
     // FPS
     frameRate: number;
@@ -50,13 +50,14 @@ export class GameWindow {
     fPlayerX: number = 256;
     fPlayerY: number = 256;
     fPlayerDeg: number = this.ANGLE_5_DEG;
-    fPlayerSpeed: number = 7;
+    fPlayerSpeed: number = 6;
     fKeyUp: boolean = false;
     fKeyDown: boolean = false;
     fKeyLeft: boolean = false;
     fKeyRight: boolean = false;
     fPlayerMapX: number = 0;
     fPlayerMapY: number = 0;
+    fPlayerDistToProjectionPlane: number = 0
 
     constructor(readonly canvas: HTMLCanvasElement) {
         this.ctx = this.canvas.getContext('2d')!
@@ -83,8 +84,8 @@ export class GameWindow {
 
         for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
             // TODO : 
-            // const rad = this.degToRad(i) + 0.001
-            const rad = this.degToRad(i)
+            const rad = this.degToRad(i) + 0.001
+            // const rad = this.degToRad(i)
             this.fSinArray[i] = Math.sin(rad)
             this.fCosArray[i] = Math.cos(rad)
             this.fTanArray[i] = Math.tan(rad)
@@ -117,6 +118,8 @@ export class GameWindow {
             }
         }
 
+        this.fPlayerDistToProjectionPlane = (this.HALF_WIDTH) * this.fTanArray[this.ANGLE_30_DEG]
+
         // Recalculate Offset
         this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2)
         const map =
@@ -139,12 +142,12 @@ export class GameWindow {
         this.drawBackground()
         this.drawFPS()
         this.drawMap()
-
+        this.updatePlayerMapPosition()
+        this.raycast()
         this.calculateFPS()
         this.movePlayerPosition()
         this.rotatePlayerPosition()
 
-        this.raycast()
         // this.drawPlayerPositionOnMap()
         setTimeout(() => {
             requestAnimationFrame(this.update.bind(this))
@@ -174,11 +177,11 @@ export class GameWindow {
     }
     rotatePlayerPosition() {
         if (this.fKeyLeft) {
-            this.fPlayerDeg -= this.ANGLE_5_DEG
+            this.fPlayerDeg -= this.ANGLE_3_DEG
             if (this.fPlayerDeg < 0) this.fPlayerDeg += this.ANGLE_360_DEG
         }
         if (this.fKeyRight) {
-            this.fPlayerDeg += this.ANGLE_5_DEG
+            this.fPlayerDeg += this.ANGLE_3_DEG
             if (this.fPlayerDeg > this.ANGLE_360_DEG) {
                 this.fPlayerDeg -= this.ANGLE_360_DEG
             }
@@ -278,24 +281,35 @@ export class GameWindow {
             }
             let xEndRay
             let yEndRay
+            let distToNextWall;
             if (distToNextVerticalWall < distToNextHorizontalWall) {
                 xEndRay = verticalGridPosition
                 yEndRay = yIntersection
+                distToNextWall = distToNextVerticalWall
             } else {
                 xEndRay = xIntersection
                 yEndRay = horizontalGridPosition
+                distToNextWall = distToNextHorizontalWall
             }
+            // Compute the height based on the distance of the ray
+            const wallHeight = (this.fPlayerDistToProjectionPlane * (this.TILE_SIZE/distToNextWall))
+            this.drawWall(wallHeight, i)
+
             this.drawRayCast(xEndRay, yEndRay, 'cyan')
             curDeg += inc;
             if (curDeg > this.ANGLE_360_DEG) curDeg = curDeg - this.ANGLE_360_DEG
         }
-
     }
-
+    drawWall(wallHeight: number, idx: number) {
+        const xStart = idx + this.windowOffset
+        const yStart = this.HALF_HEIGHT - (wallHeight / 2)
+        const xEnd = xStart
+        const yEnd = yStart + wallHeight
+        this.drawLine(xStart, yStart, xEnd, yEnd, '#fb7eff')
+    }
     drawRayCast(x: number, y: number, color: string) {
-        this.drawLine(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE) + this.windowOffset, ((y * this.miniMapWidth) / this.TILE_SIZE), color)
+        this.drawLine(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE), ((y * this.miniMapWidth) / this.TILE_SIZE), color)
     }
-
     handleKeyDownBinding() {
         window.addEventListener('keydown', (e) => {
             if (e.key === 'w') this.fKeyUp = true
@@ -360,16 +374,16 @@ export class GameWindow {
                 }
                 this.ctx.beginPath()
                 this.ctx.strokeStyle = color
-                this.drawRect(col * this.miniMapWidth + this.windowOffset, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth, color)
+                this.drawRect(col * this.miniMapWidth, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth, color)
                 // this.ctx.strokeRect(col * this.miniMapWidth + this.windowOffset, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth)
                 // this.ctx.stroke()
             }
         }
-
-        this.fPlayerMapX = (this.fPlayerX / this.TILE_SIZE * this.miniMapWidth) + this.windowOffset
+    }
+    updatePlayerMapPosition() {
+        this.fPlayerMapX = (this.fPlayerX / this.TILE_SIZE * this.miniMapWidth)
         this.fPlayerMapY = this.fPlayerY / this.TILE_SIZE * this.miniMapWidth
     }
-
     drawPlayerPositionOnMap() {
         const dist = 20;
         this.drawLine(this.fPlayerMapX,
@@ -386,6 +400,7 @@ export class GameWindow {
     }
     drawLine(startX: number, startY: number, endX: number, endY: number, color: string) {
         this.ctx.beginPath()
+        this.ctx.lineWidth = 2
         this.ctx.strokeStyle = color
         this.ctx.moveTo(startX, startY)
         this.ctx.lineTo(endX, endY)
