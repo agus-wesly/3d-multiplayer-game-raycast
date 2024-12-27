@@ -110,6 +110,7 @@
   },
 
   "files": [
-      "./script.ts"
+      "./script.ts",
+      "./constant.ts"
   ]
 }
