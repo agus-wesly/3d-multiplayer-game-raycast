@@ -1,3 +1,12 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 import { GRAY, LIME_GREEN, WHITESMOKE } from "./constant.js";
 // let debug = false;
 export class GameWindow {
@@ -17,11 +26,14 @@ export class GameWindow {
         this.windowOffset = 0;
         this.miniMapWidth = 16;
         this.TILE_SIZE = 64;
+        // Wall
+        this.fWallTextures = {};
         // Angle
         this.ANGLE_60_DEG = this.WIDTH;
         this.ANGLE_30_DEG = Math.floor(this.ANGLE_60_DEG / 2);
         this.ANGLE_2_DEG = Math.floor(this.ANGLE_30_DEG / 15);
         this.ANGLE_3_DEG = Math.floor(this.ANGLE_30_DEG / 10);
+        this.ANGLE_4_DEG = Math.floor(this.ANGLE_60_DEG / 15);
         this.ANGLE_5_DEG = Math.floor(this.ANGLE_30_DEG / 6);
         this.ANGLE_10_DEG = Math.floor(this.ANGLE_5_DEG * 2);
         this.ANGLE_90_DEG = Math.floor(this.ANGLE_30_DEG * 3);
@@ -44,7 +56,7 @@ export class GameWindow {
         this.fPlayerX = 156;
         this.fPlayerY = 256;
         this.fPlayerDeg = this.ANGLE_90_DEG;
-        this.fPlayerSpeed = 5;
+        this.fPlayerSpeed = 7;
         this.fKeyUp = false;
         this.fKeyDown = false;
         this.fKeyLeft = false;
@@ -52,11 +64,7 @@ export class GameWindow {
         this.fPlayerMapX = 0;
         this.fPlayerMapY = 0;
         this.fPlayerDistToProjectionPlane = 0;
-        // wall
-        this.images = {};
-        this.tempWallTexture = null;
-        this.tempWallTextureBuffer = null;
-        this.tempWallTexturePixel = undefined;
+        this.fPlayerHeight = 30;
         this.ctx = this.canvas.getContext('2d');
         this.currentTimeStamp = Date.now();
         this.frameRate = 60;
@@ -68,85 +76,90 @@ export class GameWindow {
         this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, canvas.width, canvas.height);
     }
     start() {
-        this.setup();
-        this.handleKeyUpBinding();
-        this.handleKeyDownBinding();
-        requestAnimationFrame(this.update.bind(this));
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.setup();
+            this.handleKeyUpBinding();
+            this.handleKeyDownBinding();
+            requestAnimationFrame(this.update.bind(this));
+        });
     }
     setup() {
-        this.resizeCanvas();
-        this.setupWall();
-        this.fSinArray = new Array(this.ANGLE_360_DEG + 1);
-        this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
-        this.fTanArray = new Array(this.ANGLE_360_DEG + 1);
-        this.fISinArray = new Array(this.ANGLE_360_DEG + 1);
-        this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
-        this.fITanArray = new Array(this.ANGLE_360_DEG + 1);
-        this.fFishTable = new Array(this.ANGLE_60_DEG + 1);
-        this.fXStepTable = new Array(this.ANGLE_360_DEG + 1);
-        this.fYStepTable = new Array(this.ANGLE_360_DEG + 1);
-        for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
-            // TODO : 
-            const rad = this.degToRad(i) + (0.0001);
-            // const rad = this.degToRad(i)
-            this.fSinArray[i] = Math.sin(rad);
-            this.fCosArray[i] = Math.cos(rad);
-            this.fTanArray[i] = Math.tan(rad);
-            this.fISinArray[i] = 1.0 / this.fSinArray[i];
-            this.fICosArray[i] = 1.0 / this.fCosArray[i];
-            this.fITanArray[i] = 1.0 / this.fTanArray[i];
-            if (i >= this.ANGLE_90_DEG && i < this.ANGLE_270_DEG) {
-                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
-                if (this.fXStepTable[i] > 0) {
-                    this.fXStepTable[i] = -this.fXStepTable[i];
+        return __awaiter(this, void 0, void 0, function* () {
+            this.resizeCanvas();
+            yield this.setupWall();
+            yield this.setupFloor();
+            this.fSinArray = new Array(this.ANGLE_360_DEG + 1);
+            this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
+            this.fTanArray = new Array(this.ANGLE_360_DEG + 1);
+            this.fISinArray = new Array(this.ANGLE_360_DEG + 1);
+            this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
+            this.fITanArray = new Array(this.ANGLE_360_DEG + 1);
+            this.fFishTable = new Array(this.ANGLE_60_DEG + 1);
+            this.fXStepTable = new Array(this.ANGLE_360_DEG + 1);
+            this.fYStepTable = new Array(this.ANGLE_360_DEG + 1);
+            for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
+                // TODO : 
+                const rad = this.degToRad(i) + (0.0001);
+                // const rad = this.degToRad(i)
+                this.fSinArray[i] = Math.sin(rad);
+                this.fCosArray[i] = Math.cos(rad);
+                this.fTanArray[i] = Math.tan(rad);
+                this.fISinArray[i] = 1.0 / this.fSinArray[i];
+                this.fICosArray[i] = 1.0 / this.fCosArray[i];
+                this.fITanArray[i] = 1.0 / this.fTanArray[i];
+                if (i >= this.ANGLE_90_DEG && i < this.ANGLE_270_DEG) {
+                    this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
+                    if (this.fXStepTable[i] > 0) {
+                        this.fXStepTable[i] = -this.fXStepTable[i];
+                    }
+                }
+                else {
+                    this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
+                    if (this.fXStepTable[i] < 0) {
+                        this.fXStepTable[i] = -this.fXStepTable[i];
+                    }
+                }
+                if (i >= this.ANGLE_0_DEG && i < this.ANGLE_180_DEG) {
+                    this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
+                    if (this.fYStepTable[i] < 0) {
+                        this.fYStepTable[i] = -this.fYStepTable[i];
+                    }
+                }
+                else {
+                    this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
+                    if (this.fYStepTable[i] > 0) {
+                        this.fYStepTable[i] = -this.fYStepTable[i];
+                    }
                 }
             }
-            else {
-                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
-                if (this.fXStepTable[i] < 0) {
-                    this.fXStepTable[i] = -this.fXStepTable[i];
-                }
+            for (let i = -this.ANGLE_30_DEG; i <= this.ANGLE_30_DEG; ++i) {
+                const rad = this.degToRad(i);
+                this.fFishTable[i + this.ANGLE_30_DEG] = 1.0 / Math.cos(rad);
             }
-            if (i >= this.ANGLE_0_DEG && i < this.ANGLE_180_DEG) {
-                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
-                if (this.fYStepTable[i] < 0) {
-                    this.fYStepTable[i] = -this.fYStepTable[i];
-                }
-            }
-            else {
-                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
-                if (this.fYStepTable[i] > 0) {
-                    this.fYStepTable[i] = -this.fYStepTable[i];
-                }
-            }
-        }
-        for (let i = -this.ANGLE_30_DEG; i <= this.ANGLE_30_DEG; ++i) {
-            const rad = this.degToRad(i);
-            this.fFishTable[i + this.ANGLE_30_DEG] = 1.0 / Math.cos(rad);
-        }
-        this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG]);
-        // Recalculate Offset
-        this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2);
-        const map = "111111111111" +
-            "100000000001" +
-            "102200000001" +
-            "100000000001" +
-            "100000000001" +
-            "100000000001" +
-            "100000000001" +
-            "100000000301" +
-            "100044400001" +
-            "100000000201" +
-            "100000000201" +
-            "111111111111";
-        this.map = map;
+            this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG]);
+            // Recalculate Offset
+            this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2);
+            const map = "111111111111" +
+                "100000000001" +
+                "102200000001" +
+                "100000000001" +
+                "100000000001" +
+                "100001000001" +
+                "100000000001" +
+                "100000000301" +
+                "100044400001" +
+                "100000000201" +
+                "100000000201" +
+                "111111111111";
+            this.map = map;
+        });
     }
     update() {
         this.resetCanvasBuffer();
         this.drawBackground();
         this.drawMap();
         this.updatePlayerMapPosition();
-        // this.raycast()
+        this.raycast();
         this.drawPlayerPositionOnMap();
         this.paintCanvasBuffer();
         this.rotatePlayerPosition();
@@ -167,13 +180,15 @@ export class GameWindow {
         const maxWallDistance = 30;
         let dirX = undefined;
         let dirY = undefined;
+        let sinDeg = this.fSinArray[this.fPlayerDeg];
+        let cosDeg = this.fCosArray[this.fPlayerDeg];
         if (this.fKeyUp) {
-            dirX = (this.fPlayerSpeed * this.fCosArray[this.fPlayerDeg]);
-            dirY = (this.fPlayerSpeed * this.fSinArray[this.fPlayerDeg]);
+            dirX = (this.fPlayerSpeed * cosDeg);
+            dirY = (this.fPlayerSpeed * sinDeg);
         }
         if (this.fKeyDown) {
-            dirX = -(this.fPlayerSpeed * this.fCosArray[this.fPlayerDeg]);
-            dirY = -(this.fPlayerSpeed * this.fSinArray[this.fPlayerDeg]);
+            dirX = -(this.fPlayerSpeed * cosDeg);
+            dirY = -(this.fPlayerSpeed * sinDeg);
         }
         if (dirX === undefined || dirY === undefined)
             return;
@@ -187,7 +202,7 @@ export class GameWindow {
         if (dirX > 0) {
             // Right
             const idx = yIndex * this.mapWidth + (xIndex + 1);
-            if (this.map.charAt(idx) !== '0' && xDirOffset > (this.TILE_SIZE - maxWallDistance)) {
+            if ((this.map.charAt(idx) !== '0') && xDirOffset > (this.TILE_SIZE - maxWallDistance)) {
                 this.fPlayerX -= xDirOffset - (this.TILE_SIZE - maxWallDistance);
             }
         }
@@ -215,12 +230,12 @@ export class GameWindow {
     }
     rotatePlayerPosition() {
         if (this.fKeyLeft) {
-            this.fPlayerDeg -= this.ANGLE_2_DEG;
+            this.fPlayerDeg -= this.ANGLE_4_DEG;
             if (this.fPlayerDeg < 0)
                 this.fPlayerDeg += this.ANGLE_360_DEG;
         }
         if (this.fKeyRight) {
-            this.fPlayerDeg += this.ANGLE_2_DEG;
+            this.fPlayerDeg += this.ANGLE_4_DEG;
             if (this.fPlayerDeg > this.ANGLE_360_DEG) {
                 this.fPlayerDeg -= this.ANGLE_360_DEG;
             }
@@ -348,35 +363,83 @@ export class GameWindow {
             const wallHeight = this.fPlayerDistToProjectionPlane * this.TILE_SIZE / distToNextWall;
             let topWall = this.HALF_HEIGHT - (wallHeight / 2);
             let bottomWall = this.HALF_HEIGHT + (wallHeight / 2);
-            this.drawWall(currentColumn + this.windowOffset, topWall, 1, (bottomWall - topWall), wallType, offsetWall, Math.floor(160 / distToNextWall));
+            distToNextWall = Math.floor(distToNextWall);
+            this.drawWall(currentColumn + this.windowOffset, topWall, (bottomWall - topWall), wallType, offsetWall, 120 / distToNextWall);
+            this.drawFloor(bottomWall, currentColumn, curDeg);
             curDeg += 1;
             if (curDeg >= this.ANGLE_360_DEG)
                 curDeg = curDeg - this.ANGLE_360_DEG;
         }
     }
-    drawWall(x, y, w, h, wallType, offsetWall, brightnessLevel) {
-        var _a;
-        if (!wallType || !this.tempWallTexture || !this.tempWallTextureBuffer || !this.tempWallTexturePixel)
-            return;
-        brightnessLevel = brightnessLevel * 10;
-        const bytesPerPixel = 4;
-        // Modify the pixel based on brightness
-        const sourceIdx = offsetWall * bytesPerPixel;
-        const red = this.tempWallTexturePixel.data[sourceIdx];
-        const green = this.tempWallTexturePixel.data[sourceIdx + 1];
-        const blue = this.tempWallTexturePixel.data[sourceIdx + 2];
-        const opac = this.tempWallTexturePixel.data[sourceIdx + 3];
-        this.tempWallTexturePixel.data[sourceIdx] = red * brightnessLevel;
-        this.tempWallTexturePixel.data[sourceIdx + 1] = green * brightnessLevel;
-        this.tempWallTexturePixel.data[sourceIdx + 2] = blue * brightnessLevel;
-        this.tempWallTexturePixel.data[sourceIdx + 3] = opac;
-        (_a = this.tempWallTextureBuffer.getContext('2d')) === null || _a === void 0 ? void 0 : _a.putImageData(this.tempWallTexturePixel, 0, 0);
-        this.ctx.drawImage(this.tempWallTextureBuffer, Math.floor(offsetWall), 0, 1, this.TILE_SIZE, x, y, w, h);
-        this.tempWallTexturePixel.data[sourceIdx] = red;
-        this.tempWallTexturePixel.data[sourceIdx + 1] = green;
-        this.tempWallTexturePixel.data[sourceIdx + 2] = blue;
-        this.tempWallTexturePixel.data[sourceIdx + 3] = opac;
-        // this.drawRect(idx + this.windowOffset, topWall, 1, (bottomWall - topWall), color)
+    drawFloor(bottomWall, currentColumn, curDeg) {
+        bottomWall = Math.floor(bottomWall);
+        let targetIndex = (bottomWall * this.BYTES_PER_PIXEL * this.offscreenCanvas.width) + ((currentColumn + this.windowOffset) * this.BYTES_PER_PIXEL);
+        for (let curDist = bottomWall - 1; curDist < this.HEIGHT; ++curDist) {
+            let diagonalDistance = Math.floor(this.fPlayerHeight / (curDist - this.HALF_HEIGHT) * this.fPlayerDistToProjectionPlane) * this.fFishTable[currentColumn];
+            let xEnd = diagonalDistance * this.fCosArray[curDeg];
+            let yEnd = diagonalDistance * this.fSinArray[curDeg];
+            xEnd += this.fPlayerX;
+            yEnd += this.fPlayerY;
+            let xPos = Math.floor(xEnd / this.TILE_SIZE);
+            let yPos = Math.floor(yEnd / this.TILE_SIZE);
+            if (xPos < 0 || yPos < 0 || xPos > this.mapWidth || yPos > this.mapHeight) {
+                break;
+            }
+            let offsetFloorX = Math.floor(xEnd % this.TILE_SIZE);
+            let offsetFloorY = Math.floor(yEnd % this.TILE_SIZE);
+            let sourceIndex = (offsetFloorY * this.BYTES_PER_PIXEL * this.TILE_SIZE) + (offsetFloorX * this.BYTES_PER_PIXEL);
+            if (!this.fFloorTexturePixel)
+                throw new Error('not loaded yet');
+            let brightness = (120 / diagonalDistance);
+            const red = this.fFloorTexturePixel.data[sourceIndex] * brightness;
+            const green = this.fFloorTexturePixel.data[sourceIndex + 1] * brightness;
+            const blue = this.fFloorTexturePixel.data[sourceIndex + 2] * brightness;
+            const alpha = this.fFloorTexturePixel.data[sourceIndex + 3];
+            this.offscreenCanvasPixel.data[targetIndex] = red;
+            this.offscreenCanvasPixel.data[targetIndex + 1] = green;
+            this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
+            this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
+            targetIndex += (this.BYTES_PER_PIXEL * this.offscreenCanvas.width);
+        }
+    }
+    drawWall(x, y, h, wallType, offsetWall, brightnessLevel) {
+        if (!wallType)
+            throw new Error('Wall type not specified');
+        const wallTexturePixel = this.fWallTextures[wallType];
+        if (!wallTexturePixel)
+            throw new Error('Texture not loaded yet');
+        x = Math.floor(x);
+        y = Math.floor(y);
+        h = Math.floor(h);
+        offsetWall = Math.floor(offsetWall);
+        let targetIndex = (this.BYTES_PER_PIXEL * this.canvas.width * y) + (this.BYTES_PER_PIXEL * x);
+        let sourceIndex = offsetWall * this.BYTES_PER_PIXEL;
+        let lastSourceIndex = sourceIndex + (this.BYTES_PER_PIXEL * wallTexturePixel.width * wallTexturePixel.height) - (wallTexturePixel.height);
+        let heightToDraw = h;
+        let yError = 0;
+        while (true) {
+            yError += h;
+            const red = Math.floor(wallTexturePixel.data[sourceIndex] * brightnessLevel);
+            const green = Math.floor(wallTexturePixel.data[sourceIndex + 1] * brightnessLevel);
+            const blue = Math.floor(wallTexturePixel.data[sourceIndex + 2] * brightnessLevel);
+            const alpha = wallTexturePixel.data[sourceIndex + 3];
+            while (yError >= this.TILE_SIZE) {
+                yError -= this.TILE_SIZE;
+                this.offscreenCanvasPixel.data[targetIndex] = red;
+                this.offscreenCanvasPixel.data[targetIndex + 1] = green;
+                this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
+                this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
+                --heightToDraw;
+                if (heightToDraw <= 0) {
+                    return;
+                }
+                targetIndex += (this.BYTES_PER_PIXEL * this.canvas.width);
+            }
+            sourceIndex += (this.BYTES_PER_PIXEL * this.TILE_SIZE);
+            if (sourceIndex > lastSourceIndex) {
+                sourceIndex = lastSourceIndex;
+            }
+        }
     }
     drawRayCast(x, y, color) {
         this.drawLine(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE), ((y * this.miniMapWidth) / this.TILE_SIZE), color);
@@ -413,40 +476,51 @@ export class GameWindow {
         this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
     setupWall() {
-        ['1', '2', '3', '4'].forEach((el) => {
-            const img = document.createElement('img');
-            img.src = `./assets/walls/wall${el}.jpg`;
-            this.images[el] = img;
-        });
-        const img = new Image(64, 64);
-        this.tempWallTexture = img;
-        img.src = 'assets/walls/wall1.jpg';
-        img.crossOrigin = "Anonymous";
-        img.onload = this.onWallLoaded.bind(this);
+        return Promise.all([1, 2, 3, 4].map((el) => {
+            return new Promise(res => {
+                const img = new Image(64, 64);
+                img.src = `assets/walls/wall${el}.jpg`;
+                img.crossOrigin = "Anonymous";
+                img.onload = () => {
+                    var _a;
+                    const c = document.createElement('canvas');
+                    (_a = c.getContext('2d')) === null || _a === void 0 ? void 0 : _a.drawImage(img, 0, 0);
+                    this.fWallTextures[`${el}`] = c.getContext('2d').getImageData(0, 0, 64, 64);
+                    return res(null);
+                };
+            });
+        }));
+        // ['1', '2', '3', '4'].forEach((el: string) => {
+        //     const img = document.createElement('img')
+        //     img.src = `./assets/walls/wall${el}.jpg`
+        //     this.images[el] = img
+        // });
     }
-    onWallLoaded() {
-        var _a, _b;
-        if (!this.tempWallTexture)
-            return;
-        this.tempWallTextureBuffer = document.createElement('canvas');
-        this.tempWallTextureBuffer.width = this.tempWallTexture.width;
-        this.tempWallTextureBuffer.height = this.tempWallTexture.height;
-        (_a = this.tempWallTextureBuffer.getContext('2d')) === null || _a === void 0 ? void 0 : _a.drawImage(this.tempWallTexture, 0, 0, 64, 64);
-        this.tempWallTexturePixel = (_b = this.tempWallTextureBuffer.getContext('2d')) === null || _b === void 0 ? void 0 : _b.getImageData(0, 0, this.tempWallTexture.width, this.tempWallTexture.height);
+    setupFloor() {
+        return new Promise((res, rej) => {
+            const img = new Image(64, 64);
+            img.src = `assets/floor/floortile.png`;
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                const c = document.createElement('canvas');
+                const x = c.getContext('2d');
+                if (!x)
+                    throw rej('Setup floor');
+                x.drawImage(img, 0, 0);
+                this.fFloorTexturePixel = x.getImageData(0, 0, 64, 64);
+                res(null);
+            };
+        });
     }
     drawBackground() {
         let c = 70;
         let i = 0;
         for (i = 0; i < this.HEIGHT / 2; ++i) {
-            // this.drawLine(0 + this.windowOffset, i, this.WIDTH + this.windowOffset, i, { red: 247, green: c, blue: 25, alpha: 255 })
-            // c = Math.min(c + 0.25, 145);
             this.drawFilledRect(0 + this.windowOffset, i, this.WIDTH, 1, { red: 247, green: c, blue: 25, alpha: 255 });
             c = Math.min(c + 0.25, 145);
         }
         c = 22;
         for (; i < this.HEIGHT; ++i) {
-            // this.drawLine(0 + this.windowOffset, i, this.WIDTH + this.windowOffset, i, { red: c, green: 20, blue: 20, alpha: 255 })
-            // c = Math.min(c + 1, 200);
             this.drawFilledRect(0 + this.windowOffset, i, this.WIDTH, 1, { red: c, green: 20, blue: 20, alpha: 255 });
             c = Math.min(c + 1, 200);
         }
@@ -538,7 +612,7 @@ export class GameWindow {
         let errY = 0;
         if (dx > dy) {
             length = dx;
-            for (let i = 0; i < length; ++i) {
+            for (let i = 0; i <= length; ++i) {
                 this.offscreenCanvasPixel.data[targetIndex] = color.red;
                 this.offscreenCanvasPixel.data[targetIndex + 1] = color.green;
                 this.offscreenCanvasPixel.data[targetIndex + 2] = color.blue;
@@ -553,7 +627,7 @@ export class GameWindow {
         }
         else {
             length = dy;
-            for (let i = 0; i < length; ++i) {
+            for (let i = 0; i <= length; ++i) {
                 this.offscreenCanvasPixel.data[targetIndex] = color.red;
                 this.offscreenCanvasPixel.data[targetIndex + 1] = color.green;
                 this.offscreenCanvasPixel.data[targetIndex + 2] = color.blue;
