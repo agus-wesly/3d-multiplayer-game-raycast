@@ -33,6 +33,7 @@ export class GameWindow {
 
     // Wall
     fWallTextures: Record<string, ImageData> = {};
+    fDiagonalDistanceWall: Array<Array<number>> = [];
 
     // Floor
     fFloorTexturePixel: ImageData | undefined;
@@ -110,6 +111,7 @@ export class GameWindow {
         this.fFishTable = new Array(this.ANGLE_60_DEG + 1)
         this.fXStepTable = new Array(this.ANGLE_360_DEG + 1)
         this.fYStepTable = new Array(this.ANGLE_360_DEG + 1)
+        this.fDiagonalDistanceWall = new Array(this.WIDTH);
 
         for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
             // TODO : 
@@ -155,6 +157,20 @@ export class GameWindow {
 
         this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG])
 
+        for (let i = 0; i < this.fDiagonalDistanceWall.length; ++i) {
+            this.fDiagonalDistanceWall[i] = new Array(this.HALF_HEIGHT);
+        }
+        for (let i = 0; i < this.WIDTH; ++i) {
+            for (let j = this.HALF_HEIGHT; j < this.HEIGHT; ++j) {
+                let sub = j - this.HALF_HEIGHT;
+                let ratio = (this.fPlayerHeight) / sub;
+                let diagonalDistance = (Math.floor(this.fPlayerDistToProjectionPlane * ratio)) * (this.fFishTable[i]);
+                this.fDiagonalDistanceWall[i][j] = diagonalDistance;
+
+            }
+        }
+
+
         // Recalculate Offset
         this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2)
         const map =
@@ -187,9 +203,7 @@ export class GameWindow {
         this.calculateFPS()
         this.drawFPS()
 
-        setTimeout(() => {
-            requestAnimationFrame(this.update.bind(this))
-        }, 1000 / this.frameRate)
+        requestAnimationFrame(this.update.bind(this))
     }
     resetCanvasBuffer() {
         this.offscreenCanvasContext.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
@@ -411,10 +425,13 @@ export class GameWindow {
     }
     drawFloor(bottomWall: number, currentColumn: number, curDeg: number) {
         bottomWall = Math.floor(bottomWall);
-        let targetIndex = (bottomWall * this.BYTES_PER_PIXEL * this.offscreenCanvas.width) + ((currentColumn + this.windowOffset) * this.BYTES_PER_PIXEL);
-        for (let curDist = bottomWall-1; curDist < this.HEIGHT; ++curDist) {
-            let diagonalDistance = Math.floor(this.fPlayerHeight / (curDist - this.HALF_HEIGHT) * this.fPlayerDistToProjectionPlane) * this.fFishTable[currentColumn];
+        let targetIndex =
+            (bottomWall * this.BYTES_PER_PIXEL * this.offscreenCanvas.width)
+            + ((currentColumn + this.windowOffset) * this.BYTES_PER_PIXEL);
 
+
+        for (let curDist = bottomWall; curDist < this.HEIGHT; ++curDist) {
+            let diagonalDistance = this.fDiagonalDistanceWall[currentColumn][curDist];
             let xEnd = diagonalDistance * this.fCosArray[curDeg]
             let yEnd = diagonalDistance * this.fSinArray[curDeg]
 
