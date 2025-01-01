@@ -32,7 +32,7 @@ export class GameWindow {
     TILE_SIZE: number = 64;
 
     // Wall
-    fWallTextures: Record<string, any> = {};
+    fWallTextures: Record<string, HTMLCanvasElement> = {};
     fDiagonalDistanceWall: Array<Array<number>> = [];
 
     // Floor
@@ -95,14 +95,14 @@ export class GameWindow {
         this.handleKeyUpBinding()
         this.handleKeyDownBinding()
 
-        this.thenTimeStamp= Date.now();
+        this.thenTimeStamp = Date.now();
         this.startTime = this.thenTimeStamp;
         requestAnimationFrame(this.update.bind(this))
     }
     async setup() {
         this.resizeCanvas()
         // await this.setupWall()
-        this.setupWall2()
+        await this.setupWall2()
         await this.setupFloor()
 
         this.fSinArray = new Array(this.ANGLE_360_DEG + 1)
@@ -478,58 +478,58 @@ export class GameWindow {
         }
 
     }
-    drawWall(x: number, y: number, h: number, wallType: string | undefined, offsetWall: number, brightnessLevel: number) {
-        if (!wallType) throw new Error('Wall type not specified')
-        const wallTexturePixel = this.fWallTextures[wallType]
-        if (!wallTexturePixel) throw new Error('Texture not loaded yet')
-        x = Math.floor(x)
-        y = Math.floor(y)
-        h = Math.floor(h)
-        offsetWall = Math.floor(offsetWall)
-        let targetIndex = (this.BYTES_PER_PIXEL * this.canvas.width * y) + (this.BYTES_PER_PIXEL * x)
-        let sourceIndex = offsetWall * this.BYTES_PER_PIXEL
-        let lastSourceIndex = sourceIndex + (this.BYTES_PER_PIXEL * wallTexturePixel.width * wallTexturePixel.height) - (wallTexturePixel.height)
-        let heightToDraw = h
-        let yError = 0
+    // drawWall(x: number, y: number, h: number, wallType: string | undefined, offsetWall: number, brightnessLevel: number) {
+    //     if (!wallType) throw new Error('Wall type not specified')
+    //     const wallTexturePixel = this.fWallTextures[wallType]
+    //     if (!wallTexturePixel) throw new Error('Texture not loaded yet')
+    //     x = Math.floor(x)
+    //     y = Math.floor(y)
+    //     h = Math.floor(h)
+    //     offsetWall = Math.floor(offsetWall)
+    //     let targetIndex = (this.BYTES_PER_PIXEL * this.canvas.width * y) + (this.BYTES_PER_PIXEL * x)
+    //     let sourceIndex = offsetWall * this.BYTES_PER_PIXEL
+    //     let lastSourceIndex = sourceIndex + (this.BYTES_PER_PIXEL * wallTexturePixel.width * wallTexturePixel.height) - (wallTexturePixel.height)
+    //     let heightToDraw = h
+    //     let yError = 0
 
-        while (true) {
-            yError += h
-            const red = Math.floor(wallTexturePixel.data[sourceIndex] * brightnessLevel)
-            const green = Math.floor(wallTexturePixel.data[sourceIndex + 1] * brightnessLevel)
-            const blue = Math.floor(wallTexturePixel.data[sourceIndex + 2] * brightnessLevel)
-            const alpha = wallTexturePixel.data[sourceIndex + 3]
-            while (yError >= this.TILE_SIZE) {
-                yError -= this.TILE_SIZE
+    //     while (true) {
+    //         yError += h
+    //         const red = Math.floor(wallTexturePixel.data[sourceIndex] * brightnessLevel)
+    //         const green = Math.floor(wallTexturePixel.data[sourceIndex + 1] * brightnessLevel)
+    //         const blue = Math.floor(wallTexturePixel.data[sourceIndex + 2] * brightnessLevel)
+    //         const alpha = wallTexturePixel.data[sourceIndex + 3]
+    //         while (yError >= this.TILE_SIZE) {
+    //             yError -= this.TILE_SIZE
 
-                this.offscreenCanvasPixel.data[targetIndex] = red;
-                this.offscreenCanvasPixel.data[targetIndex + 1] = green;
-                this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
-                this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
+    //             this.offscreenCanvasPixel.data[targetIndex] = red;
+    //             this.offscreenCanvasPixel.data[targetIndex + 1] = green;
+    //             this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
+    //             this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
 
-                --heightToDraw;
-                if (heightToDraw <= 0) {
-                    return;
-                }
+    //             --heightToDraw;
+    //             if (heightToDraw <= 0) {
+    //                 return;
+    //             }
 
-                targetIndex += (this.BYTES_PER_PIXEL * this.canvas.width)
-            }
-            sourceIndex += (this.BYTES_PER_PIXEL * this.TILE_SIZE)
-            if (sourceIndex > lastSourceIndex) {
-                sourceIndex = lastSourceIndex
-            }
-        }
-    }
+    //             targetIndex += (this.BYTES_PER_PIXEL * this.canvas.width)
+    //         }
+    //         sourceIndex += (this.BYTES_PER_PIXEL * this.TILE_SIZE)
+    //         if (sourceIndex > lastSourceIndex) {
+    //             sourceIndex = lastSourceIndex
+    //         }
+    //     }
+    // }
 
     drawWall2(x: number, y: number, h: number, wallType: string | undefined, offsetWall: number, brightnessLevel: number) {
         if (!wallType) throw new Error('Wall type not specified');
-        const wallTexturePixel = this.fWallTextures[`${1}`];
+        const wallTexturePixel = this.fWallTextures[`${wallType}`];
         if (!wallTexturePixel) throw new Error('Texture not loaded yet');
         x = Math.floor(x);
         y = Math.floor(y);
         h = Math.floor(h);
         offsetWall = Math.floor(offsetWall);
 
-        // drawImage(image: CanvasImageSource, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number): void;
+        // TODO : modify the pixel with brightnessLevel
         this.ctx.drawImage(
             wallTexturePixel,
             offsetWall,
@@ -570,7 +570,29 @@ export class GameWindow {
         this.offscreenCanvas.height = this.canvas.height
         this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height)
     }
-    setupWall() {
+    // setupWall() {
+    //     return Promise.all(
+    //         [1, 2, 3, 4].map((el: number) => {
+    //             return new Promise(res => {
+    //                 const img = new Image(64, 64)
+    //                 img.src = `assets/walls/wall${el}.jpg`
+    //                 img.crossOrigin = "Anonymous"
+    //                 img.onload = () => {
+    //                     const c = document.createElement('canvas')
+    //                     c.getContext('2d')?.drawImage(img, 0, 0)
+    //                     this.fWallTextures[`${el}`] = c.getContext('2d')!.getImageData(0, 0, 64, 64);
+    //                     return res(null)
+    //                 }
+    //             })
+    //         })
+    //     )
+    //     // ['1', '2', '3', '4'].forEach((el: string) => {
+    //     //     const img = document.createElement('img')
+    //     //     img.src = `./assets/walls/wall${el}.jpg`
+    //     //     this.images[el] = img
+    //     // });
+    // }
+    setupWall2() {
         return Promise.all(
             [1, 2, 3, 4].map((el: number) => {
                 return new Promise(res => {
@@ -580,28 +602,12 @@ export class GameWindow {
                     img.onload = () => {
                         const c = document.createElement('canvas')
                         c.getContext('2d')?.drawImage(img, 0, 0)
-                        this.fWallTextures[`${el}`] = c.getContext('2d')!.getImageData(0, 0, 64, 64);
+                        this.fWallTextures[`${el}`] = c;
                         return res(null)
                     }
                 })
             })
         )
-        // ['1', '2', '3', '4'].forEach((el: string) => {
-        //     const img = document.createElement('img')
-        //     img.src = `./assets/walls/wall${el}.jpg`
-        //     this.images[el] = img
-        // });
-    }
-    setupWall2() {
-        const img = new Image(64, 64)
-        img.src = `assets/walls/wall${1}.jpg`
-        img.crossOrigin = "Anonymous"
-        img.onload = () => {
-            const c = document.createElement('canvas')
-            c.getContext('2d')?.drawImage(img, 0, 0)
-            // this.fWallTextures[`${1}`] = c.getContext('2d')!.getImageData(0, 0, 64, 64);
-            this.fWallTextures[`${1}`] = c;
-        }
     }
     setupFloor() {
         return new Promise((res, rej) => {
