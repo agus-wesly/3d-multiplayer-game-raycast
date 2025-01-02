@@ -3,10 +3,11 @@ import { GRAY, LIME_GREEN, RGB, rgbToString, WHITESMOKE } from "./constant.js"
 export class GameWindow {
     // Canvas
     ctx: CanvasRenderingContext2D;
-    WIDTH: number = 960;
-    HEIGHT: number = 656;
-    HALF_WIDTH: number = this.WIDTH / 2
-    HALF_HEIGHT: number = this.HEIGHT / 2
+    WIDTH: number = 0;
+    HEIGHT: number = 0;
+    HALF_WIDTH: number = 0;
+    HALF_HEIGHT: number = 0;
+    MAX_WIDTH: number = 1024;
 
     readonly BYTES_PER_PIXEL = 4;
     offscreenCanvas: OffscreenCanvas;
@@ -39,17 +40,17 @@ export class GameWindow {
     fFloorTexturePixel: ImageData | undefined;
 
     // Angle
-    ANGLE_60_DEG: number = this.WIDTH;
-    ANGLE_30_DEG = Math.floor(this.ANGLE_60_DEG / 2);
-    ANGLE_2_DEG = Math.floor(this.ANGLE_30_DEG / 15);
-    ANGLE_3_DEG = Math.floor(this.ANGLE_30_DEG / 10);
-    ANGLE_4_DEG = Math.floor(this.ANGLE_60_DEG / 15);
-    ANGLE_5_DEG = Math.floor(this.ANGLE_30_DEG / 6);
-    ANGLE_10_DEG = Math.floor(this.ANGLE_5_DEG * 2);
-    ANGLE_90_DEG: number = Math.floor(this.ANGLE_30_DEG * 3);
-    ANGLE_180_DEG: number = Math.floor(this.ANGLE_60_DEG * 3);
-    ANGLE_270_DEG: number = Math.floor(this.ANGLE_30_DEG * 9);
-    ANGLE_360_DEG: number = Math.floor(this.ANGLE_60_DEG * 6);
+    ANGLE_60_DEG: number = 0;
+    ANGLE_30_DEG = 0;
+    ANGLE_2_DEG = 0;
+    ANGLE_3_DEG = 0;
+    ANGLE_4_DEG = 0;
+    ANGLE_5_DEG = 0;
+    ANGLE_10_DEG = 0;
+    ANGLE_90_DEG: number = 0;
+    ANGLE_180_DEG: number = 0;
+    ANGLE_270_DEG: number = 0;
+    ANGLE_360_DEG: number = 0;
     ANGLE_0_DEG: number = 0;
 
     // Angle Array
@@ -84,98 +85,31 @@ export class GameWindow {
         this.frameRate = 60
         this.fpsInterval = Math.floor(1000 / this.frameRate);
 
-        this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height)
-        const canvasBufferCtx = this.offscreenCanvas.getContext('2d')
-        if (!canvasBufferCtx) throw new Error('No context found')
-        this.offscreenCanvasContext = canvasBufferCtx
-        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, canvas.width, canvas.height)
+        // this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height)
+        // const canvasBufferCtx = this.offscreenCanvas.getContext('2d')
+        // if (!canvasBufferCtx) throw new Error('No context found')
+        // this.offscreenCanvasContext = canvasBufferCtx
+        // this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, canvas.width, canvas.height)
     }
     async start() {
         await this.setup()
         this.handleKeyUpBinding()
         this.handleKeyDownBinding()
+        this.handleWindowResize()
 
         this.thenTimeStamp = Date.now();
         this.startTime = this.thenTimeStamp;
         requestAnimationFrame(this.update.bind(this))
     }
     async setup() {
-        this.resizeCanvas()
+        // this.resizeCanvas2()
+        this.resizeWindow()
+        this.recalculateAngle()
+        this.recalculateArray()
         // await this.setupWall()
         await this.setupWall2()
         await this.setupFloor()
 
-        this.fSinArray = new Array(this.ANGLE_360_DEG + 1)
-        this.fCosArray = new Array(this.ANGLE_360_DEG + 1)
-        this.fTanArray = new Array(this.ANGLE_360_DEG + 1)
-        this.fISinArray = new Array(this.ANGLE_360_DEG + 1)
-        this.fCosArray = new Array(this.ANGLE_360_DEG + 1)
-        this.fITanArray = new Array(this.ANGLE_360_DEG + 1)
-        this.fFishTable = new Array(this.ANGLE_60_DEG + 1)
-        this.fXStepTable = new Array(this.ANGLE_360_DEG + 1)
-        this.fYStepTable = new Array(this.ANGLE_360_DEG + 1)
-        this.fDiagonalDistanceWall = new Array(this.WIDTH);
-
-        for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
-            // TODO : 
-            const rad = this.degToRad(i) + (0.0001)
-            // const rad = this.degToRad(i)
-            this.fSinArray[i] = Math.sin(rad)
-            this.fCosArray[i] = Math.cos(rad)
-            this.fTanArray[i] = Math.tan(rad)
-            this.fISinArray[i] = 1.0 / this.fSinArray[i]
-            this.fICosArray[i] = 1.0 / this.fCosArray[i]
-            this.fITanArray[i] = 1.0 / this.fTanArray[i]
-
-            if (i >= this.ANGLE_90_DEG && i < this.ANGLE_270_DEG) {
-                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
-                if (this.fXStepTable[i] > 0) {
-                    this.fXStepTable[i] = -this.fXStepTable[i]
-                }
-            } else {
-                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
-                if (this.fXStepTable[i] < 0) {
-                    this.fXStepTable[i] = -this.fXStepTable[i]
-                }
-            }
-
-            if (i >= this.ANGLE_0_DEG && i < this.ANGLE_180_DEG) {
-                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE
-                if (this.fYStepTable[i] < 0) {
-                    this.fYStepTable[i] = -this.fYStepTable[i]
-                }
-            } else {
-                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE
-                if (this.fYStepTable[i] > 0) {
-                    this.fYStepTable[i] = -this.fYStepTable[i]
-                }
-            }
-
-        }
-
-        for (let i = -this.ANGLE_30_DEG; i <= this.ANGLE_30_DEG; ++i) {
-            const rad = this.degToRad(i)
-            this.fFishTable[i + this.ANGLE_30_DEG] = 1.0 / Math.cos(rad)
-        }
-
-        this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG])
-
-        for (let i = 0; i < this.fDiagonalDistanceWall.length; ++i) {
-            this.fDiagonalDistanceWall[i] = new Array(this.HALF_HEIGHT);
-        }
-        for (let i = 0; i < this.WIDTH; ++i) {
-            for (let j = this.HALF_HEIGHT; j < this.HEIGHT; ++j) {
-                let sub = j - this.HALF_HEIGHT;
-                let ratio = (this.fPlayerHeight) / sub;
-                let diagonalDistance = (Math.floor(this.fPlayerDistToProjectionPlane * ratio)) * (this.fFishTable[i]);
-                this.fDiagonalDistanceWall[i][j] = diagonalDistance;
-
-            }
-        }
-
-
-        // Recalculate Offset
-        this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2)
         const map =
             "111111111111" +
             "100000000001" +
@@ -197,9 +131,11 @@ export class GameWindow {
         this.nowTimeStamp = Date.now();
         let interval = this.nowTimeStamp - this.thenTimeStamp;
         if (interval > this.fpsInterval) {
+            // if (true) {
             this.thenTimeStamp = this.nowTimeStamp - (interval % this.fpsInterval);
 
             // this.resetCanvasBuffer()
+            // this.resizeWindow()
             this.drawBackground()
             this.drawMap()
             this.updatePlayerMapPosition()
@@ -563,12 +499,129 @@ export class GameWindow {
             else if (e.key === 'd') this.fKeyRight = false
         })
     }
+    handleWindowResize() {
+        window.addEventListener('resize', () => {
+            // if(window.innerWidth > this.MAX_WIDTH) return;
+            // console.log(window.innerWidth);
+            this.resizeWindow();
+            this.recalculateAngle();
+            this.recalculateArray();
+        })
+
+    }
     resizeCanvas() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         this.offscreenCanvas.width = this.canvas.width
         this.offscreenCanvas.height = this.canvas.height
         this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height)
+    }
+    resizeWindow() {
+        // Take the window width and height
+        const ASPECT_W = 16;
+        const ASPECT_H = 9;
+
+        const w = Math.floor(window.innerWidth/this.TILE_SIZE) * this.TILE_SIZE;
+        let h = (w / ASPECT_W) * ASPECT_H;
+        h = Math.min(h,636);
+
+        this.canvas.width = w;
+        this.canvas.height = h;
+        this.WIDTH = w;
+        this.HEIGHT = h;
+        this.HALF_WIDTH = Math.floor(w / 2);
+        this.HALF_HEIGHT = Math.floor(h / 2);
+
+        this.offscreenCanvas = new OffscreenCanvas(w, h);
+        const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
+        if (!canvasBufferCtx) throw new Error('No context found');
+        this.offscreenCanvasContext = canvasBufferCtx;
+        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+    }
+    recalculateAngle() {
+        this.ANGLE_60_DEG = this.WIDTH;
+        this.ANGLE_30_DEG = Math.floor(this.ANGLE_60_DEG / 2);
+        this.ANGLE_2_DEG = Math.floor(this.ANGLE_30_DEG / 15);
+        this.ANGLE_3_DEG = Math.floor(this.ANGLE_30_DEG / 10);
+        this.ANGLE_4_DEG = Math.floor(this.ANGLE_60_DEG / 15);
+        this.ANGLE_5_DEG = Math.floor(this.ANGLE_30_DEG / 6);
+        this.ANGLE_10_DEG = Math.floor(this.ANGLE_5_DEG * 2);
+        this.ANGLE_90_DEG = Math.floor(this.ANGLE_30_DEG * 3);
+        this.ANGLE_180_DEG = Math.floor(this.ANGLE_60_DEG * 3);
+        this.ANGLE_270_DEG = Math.floor(this.ANGLE_30_DEG * 9);
+        this.ANGLE_360_DEG = Math.floor(this.ANGLE_60_DEG * 6);
+        this.ANGLE_0_DEG = 0;
+    }
+    recalculateArray() {
+        this.fSinArray = new Array(this.ANGLE_360_DEG + 1)
+        this.fCosArray = new Array(this.ANGLE_360_DEG + 1)
+        this.fTanArray = new Array(this.ANGLE_360_DEG + 1)
+        this.fISinArray = new Array(this.ANGLE_360_DEG + 1)
+        this.fCosArray = new Array(this.ANGLE_360_DEG + 1)
+        this.fITanArray = new Array(this.ANGLE_360_DEG + 1)
+        this.fFishTable = new Array(this.ANGLE_60_DEG + 1)
+        this.fXStepTable = new Array(this.ANGLE_360_DEG + 1)
+        this.fYStepTable = new Array(this.ANGLE_360_DEG + 1)
+        this.fDiagonalDistanceWall = new Array(this.WIDTH);
+
+        for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
+            // TODO : 
+            const rad = this.degToRad(i) + (0.0001)
+            // const rad = this.degToRad(i)
+            this.fSinArray[i] = Math.sin(rad)
+            this.fCosArray[i] = Math.cos(rad)
+            this.fTanArray[i] = Math.tan(rad)
+            this.fISinArray[i] = 1.0 / this.fSinArray[i]
+            this.fICosArray[i] = 1.0 / this.fCosArray[i]
+            this.fITanArray[i] = 1.0 / this.fTanArray[i]
+
+            if (i >= this.ANGLE_90_DEG && i < this.ANGLE_270_DEG) {
+                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
+                if (this.fXStepTable[i] > 0) {
+                    this.fXStepTable[i] = -this.fXStepTable[i]
+                }
+            } else {
+                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i]
+                if (this.fXStepTable[i] < 0) {
+                    this.fXStepTable[i] = -this.fXStepTable[i]
+                }
+            }
+
+            if (i >= this.ANGLE_0_DEG && i < this.ANGLE_180_DEG) {
+                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE
+                if (this.fYStepTable[i] < 0) {
+                    this.fYStepTable[i] = -this.fYStepTable[i]
+                }
+            } else {
+                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE
+                if (this.fYStepTable[i] > 0) {
+                    this.fYStepTable[i] = -this.fYStepTable[i]
+                }
+            }
+
+        }
+
+        for (let i = -this.ANGLE_30_DEG; i <= this.ANGLE_30_DEG; ++i) {
+            const rad = this.degToRad(i)
+            this.fFishTable[i + this.ANGLE_30_DEG] = 1.0 / Math.cos(rad)
+        }
+
+        this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG])
+
+        for (let i = 0; i < this.fDiagonalDistanceWall.length; ++i) {
+            this.fDiagonalDistanceWall[i] = new Array(this.HALF_HEIGHT);
+        }
+        for (let i = 0; i < this.WIDTH; ++i) {
+            for (let j = this.HALF_HEIGHT; j < this.HEIGHT; ++j) {
+                let sub = j - this.HALF_HEIGHT;
+                let ratio = (this.fPlayerHeight) / sub;
+                let diagonalDistance = (Math.floor(this.fPlayerDistToProjectionPlane * ratio)) * (this.fFishTable[i]);
+                this.fDiagonalDistanceWall[i][j] = diagonalDistance;
+
+            }
+        }
+        // Recalculate Offset
+        this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2)
     }
     // setupWall() {
     //     return Promise.all(
@@ -645,7 +698,6 @@ export class GameWindow {
         this.ctx.fillStyle = 'black'
         this.ctx.font = "20px serif";
         const windowOffsetRight = Math.floor(this.canvas.width / 2 + this.WIDTH / 2) - 100
-        console.log(this.currentFPS);
         this.ctx.fillText("FPS : " + this.currentFPS, windowOffsetRight, 20)
     }
     drawMap() {
