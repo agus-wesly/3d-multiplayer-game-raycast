@@ -7,18 +7,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { GRAY, LIME_GREEN, WHITESMOKE } from "./constant.js";
+import { GRAY, rgbToString, WHITESMOKE } from "./constant.js";
 // let debug = false;
 export class GameWindow {
     constructor(canvas) {
         this.canvas = canvas;
-        this.WIDTH = 960;
-        this.HEIGHT = 656;
-        this.HALF_WIDTH = this.WIDTH / 2;
-        this.HALF_HEIGHT = this.HEIGHT / 2;
+        this.WIDTH = 0;
+        this.HEIGHT = 0;
+        this.HALF_WIDTH = 0;
+        this.HALF_HEIGHT = 0;
+        this.MAX_WIDTH = 1024;
         this.BYTES_PER_PIXEL = 4;
         this.currentFPS = 0;
-        this.tickCount = 0;
+        this.startTime = 0;
+        this.frameCount = 0;
+        this.nowTimeStamp = 0;
+        this.thenTimeStamp = 0;
         // Map
         this.map = "";
         this.mapWidth = 12;
@@ -30,17 +34,17 @@ export class GameWindow {
         this.fWallTextures = {};
         this.fDiagonalDistanceWall = [];
         // Angle
-        this.ANGLE_60_DEG = this.WIDTH;
-        this.ANGLE_30_DEG = Math.floor(this.ANGLE_60_DEG / 2);
-        this.ANGLE_2_DEG = Math.floor(this.ANGLE_30_DEG / 15);
-        this.ANGLE_3_DEG = Math.floor(this.ANGLE_30_DEG / 10);
-        this.ANGLE_4_DEG = Math.floor(this.ANGLE_60_DEG / 15);
-        this.ANGLE_5_DEG = Math.floor(this.ANGLE_30_DEG / 6);
-        this.ANGLE_10_DEG = Math.floor(this.ANGLE_5_DEG * 2);
-        this.ANGLE_90_DEG = Math.floor(this.ANGLE_30_DEG * 3);
-        this.ANGLE_180_DEG = Math.floor(this.ANGLE_60_DEG * 3);
-        this.ANGLE_270_DEG = Math.floor(this.ANGLE_30_DEG * 9);
-        this.ANGLE_360_DEG = Math.floor(this.ANGLE_60_DEG * 6);
+        this.ANGLE_60_DEG = 0;
+        this.ANGLE_30_DEG = 0;
+        this.ANGLE_2_DEG = 0;
+        this.ANGLE_3_DEG = 0;
+        this.ANGLE_4_DEG = 0;
+        this.ANGLE_5_DEG = 0;
+        this.ANGLE_10_DEG = 0;
+        this.ANGLE_90_DEG = 0;
+        this.ANGLE_180_DEG = 0;
+        this.ANGLE_270_DEG = 0;
+        this.ANGLE_360_DEG = 0;
         this.ANGLE_0_DEG = 0;
         // Angle Array
         this.fSinArray = [];
@@ -57,7 +61,7 @@ export class GameWindow {
         this.fPlayerX = 156;
         this.fPlayerY = 256;
         this.fPlayerDeg = this.ANGLE_90_DEG;
-        this.fPlayerSpeed = 7;
+        this.fPlayerSpeed = 3;
         this.fKeyUp = false;
         this.fKeyDown = false;
         this.fKeyLeft = false;
@@ -67,91 +71,34 @@ export class GameWindow {
         this.fPlayerDistToProjectionPlane = 0;
         this.fPlayerHeight = 30;
         this.ctx = this.canvas.getContext('2d');
-        this.currentTimeStamp = Date.now();
         this.frameRate = 60;
-        this.offscreenCanvas = document.createElement('canvas');
-        const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
-        if (!canvasBufferCtx)
-            throw new Error('No context found');
-        this.offscreenCanvasContext = canvasBufferCtx;
-        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, canvas.width, canvas.height);
+        this.fpsInterval = Math.floor(1000 / this.frameRate);
+        // this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height)
+        // const canvasBufferCtx = this.offscreenCanvas.getContext('2d')
+        // if (!canvasBufferCtx) throw new Error('No context found')
+        // this.offscreenCanvasContext = canvasBufferCtx
+        // this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, canvas.width, canvas.height)
     }
     start() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.setup();
             this.handleKeyUpBinding();
             this.handleKeyDownBinding();
+            this.handleWindowResize();
+            this.thenTimeStamp = Date.now();
+            this.startTime = this.thenTimeStamp;
             requestAnimationFrame(this.update.bind(this));
         });
     }
     setup() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.resizeCanvas();
-            yield this.setupWall();
+            // this.resizeCanvas2()
+            this.resizeWindow();
+            this.recalculateAngle();
+            this.recalculateArray();
+            // await this.setupWall()
+            yield this.setupWall2();
             yield this.setupFloor();
-            this.fSinArray = new Array(this.ANGLE_360_DEG + 1);
-            this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
-            this.fTanArray = new Array(this.ANGLE_360_DEG + 1);
-            this.fISinArray = new Array(this.ANGLE_360_DEG + 1);
-            this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
-            this.fITanArray = new Array(this.ANGLE_360_DEG + 1);
-            this.fFishTable = new Array(this.ANGLE_60_DEG + 1);
-            this.fXStepTable = new Array(this.ANGLE_360_DEG + 1);
-            this.fYStepTable = new Array(this.ANGLE_360_DEG + 1);
-            this.fDiagonalDistanceWall = new Array(this.WIDTH);
-            for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
-                // TODO : 
-                const rad = this.degToRad(i) + (0.0001);
-                // const rad = this.degToRad(i)
-                this.fSinArray[i] = Math.sin(rad);
-                this.fCosArray[i] = Math.cos(rad);
-                this.fTanArray[i] = Math.tan(rad);
-                this.fISinArray[i] = 1.0 / this.fSinArray[i];
-                this.fICosArray[i] = 1.0 / this.fCosArray[i];
-                this.fITanArray[i] = 1.0 / this.fTanArray[i];
-                if (i >= this.ANGLE_90_DEG && i < this.ANGLE_270_DEG) {
-                    this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
-                    if (this.fXStepTable[i] > 0) {
-                        this.fXStepTable[i] = -this.fXStepTable[i];
-                    }
-                }
-                else {
-                    this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
-                    if (this.fXStepTable[i] < 0) {
-                        this.fXStepTable[i] = -this.fXStepTable[i];
-                    }
-                }
-                if (i >= this.ANGLE_0_DEG && i < this.ANGLE_180_DEG) {
-                    this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
-                    if (this.fYStepTable[i] < 0) {
-                        this.fYStepTable[i] = -this.fYStepTable[i];
-                    }
-                }
-                else {
-                    this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
-                    if (this.fYStepTable[i] > 0) {
-                        this.fYStepTable[i] = -this.fYStepTable[i];
-                    }
-                }
-            }
-            for (let i = -this.ANGLE_30_DEG; i <= this.ANGLE_30_DEG; ++i) {
-                const rad = this.degToRad(i);
-                this.fFishTable[i + this.ANGLE_30_DEG] = 1.0 / Math.cos(rad);
-            }
-            this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG]);
-            for (let i = 0; i < this.fDiagonalDistanceWall.length; ++i) {
-                this.fDiagonalDistanceWall[i] = new Array(this.HALF_HEIGHT);
-            }
-            for (let i = 0; i < this.WIDTH; ++i) {
-                for (let j = this.HALF_HEIGHT; j < this.HEIGHT; ++j) {
-                    let sub = j - this.HALF_HEIGHT;
-                    let ratio = (this.fPlayerHeight) / sub;
-                    let diagonalDistance = (Math.floor(this.fPlayerDistToProjectionPlane * ratio)) * (this.fFishTable[i]);
-                    this.fDiagonalDistanceWall[i][j] = diagonalDistance;
-                }
-            }
-            // Recalculate Offset
-            this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2);
             const map = "111111111111" +
                 "100000000001" +
                 "102200000001" +
@@ -168,24 +115,35 @@ export class GameWindow {
         });
     }
     update() {
-        this.resetCanvasBuffer();
-        this.drawBackground();
-        this.drawMap();
-        this.updatePlayerMapPosition();
-        this.raycast();
-        this.drawPlayerPositionOnMap();
-        this.paintCanvasBuffer();
-        this.rotatePlayerPosition();
-        this.movePlayerPosition();
-        this.calculateFPS();
-        this.drawFPS();
         requestAnimationFrame(this.update.bind(this));
+        // in update
+        this.nowTimeStamp = Date.now();
+        let interval = this.nowTimeStamp - this.thenTimeStamp;
+        if (interval > this.fpsInterval) {
+            // if (true) {
+            this.thenTimeStamp = this.nowTimeStamp - (interval % this.fpsInterval);
+            // this.resetCanvasBuffer()
+            // this.resizeWindow()
+            this.drawBackground();
+            this.updatePlayerMapPosition();
+            this.raycast();
+            this.drawMap();
+            this.drawPlayerPositionOnMap();
+            // this.paintCanvasBuffer()
+            this.rotatePlayerPosition();
+            this.movePlayerPosition();
+            this.drawFPS();
+            const sinceStart = this.nowTimeStamp - this.startTime;
+            this.currentFPS = Math.floor(1000 / (sinceStart / ++this.frameCount) * 100 / 100);
+        }
     }
     resetCanvasBuffer() {
-        this.offscreenCanvasContext.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
     paintCanvasBuffer() {
-        this.ctx.putImageData(this.offscreenCanvasPixel, 0, 0);
+        this.offscreenCanvasContext.putImageData(this.offscreenCanvasPixel, 0, 0);
+        const imageBitMap = this.offscreenCanvas.transferToImageBitmap();
+        this.ctx.drawImage(imageBitMap, 0, 0);
     }
     movePlayerPosition() {
         const maxWallDistance = 30;
@@ -361,13 +319,13 @@ export class GameWindow {
                 distToNextWall = distToNextVerticalWall;
                 offsetWall = yIntersection % this.TILE_SIZE;
                 wallType = wallTypeVertical;
-                this.drawRayCast(verticalGridPosition, yIntersection, LIME_GREEN);
+                // this.drawRayCast(verticalGridPosition, yIntersection, LIME_GREEN)
             }
             else {
                 distToNextWall = distToNextHorizontalWall;
                 offsetWall = xIntersection % this.TILE_SIZE;
                 wallType = wallTypeHorizontal;
-                this.drawRayCast(xIntersection, horizontalGridPosition, LIME_GREEN);
+                // this.drawRayCast(xIntersection, horizontalGridPosition, LIME_GREEN)
             }
             // Compute the height based on the distance of the ray
             distToNextWall /= this.fFishTable[currentColumn];
@@ -375,8 +333,8 @@ export class GameWindow {
             let topWall = this.HALF_HEIGHT - (wallHeight / 2);
             let bottomWall = this.HALF_HEIGHT + (wallHeight / 2);
             distToNextWall = Math.floor(distToNextWall);
-            this.drawWall(currentColumn + this.windowOffset, topWall, (bottomWall - topWall), wallType, offsetWall, 120 / distToNextWall);
-            this.drawFloor(bottomWall, currentColumn, curDeg);
+            this.drawWall2(currentColumn + this.windowOffset, topWall, (bottomWall - topWall), wallType, offsetWall, 120 / distToNextWall);
+            // this.drawFloor(bottomWall, currentColumn, curDeg);
             curDeg += 1;
             if (curDeg >= this.ANGLE_360_DEG)
                 curDeg = curDeg - this.ANGLE_360_DEG;
@@ -414,47 +372,58 @@ export class GameWindow {
             targetIndex += (this.BYTES_PER_PIXEL * this.offscreenCanvas.width);
         }
     }
-    drawWall(x, y, h, wallType, offsetWall, brightnessLevel) {
+    // drawWall(x: number, y: number, h: number, wallType: string | undefined, offsetWall: number, brightnessLevel: number) {
+    //     if (!wallType) throw new Error('Wall type not specified')
+    //     const wallTexturePixel = this.fWallTextures[wallType]
+    //     if (!wallTexturePixel) throw new Error('Texture not loaded yet')
+    //     x = Math.floor(x)
+    //     y = Math.floor(y)
+    //     h = Math.floor(h)
+    //     offsetWall = Math.floor(offsetWall)
+    //     let targetIndex = (this.BYTES_PER_PIXEL * this.canvas.width * y) + (this.BYTES_PER_PIXEL * x)
+    //     let sourceIndex = offsetWall * this.BYTES_PER_PIXEL
+    //     let lastSourceIndex = sourceIndex + (this.BYTES_PER_PIXEL * wallTexturePixel.width * wallTexturePixel.height) - (wallTexturePixel.height)
+    //     let heightToDraw = h
+    //     let yError = 0
+    //     while (true) {
+    //         yError += h
+    //         const red = Math.floor(wallTexturePixel.data[sourceIndex] * brightnessLevel)
+    //         const green = Math.floor(wallTexturePixel.data[sourceIndex + 1] * brightnessLevel)
+    //         const blue = Math.floor(wallTexturePixel.data[sourceIndex + 2] * brightnessLevel)
+    //         const alpha = wallTexturePixel.data[sourceIndex + 3]
+    //         while (yError >= this.TILE_SIZE) {
+    //             yError -= this.TILE_SIZE
+    //             this.offscreenCanvasPixel.data[targetIndex] = red;
+    //             this.offscreenCanvasPixel.data[targetIndex + 1] = green;
+    //             this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
+    //             this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
+    //             --heightToDraw;
+    //             if (heightToDraw <= 0) {
+    //                 return;
+    //             }
+    //             targetIndex += (this.BYTES_PER_PIXEL * this.canvas.width)
+    //         }
+    //         sourceIndex += (this.BYTES_PER_PIXEL * this.TILE_SIZE)
+    //         if (sourceIndex > lastSourceIndex) {
+    //             sourceIndex = lastSourceIndex
+    //         }
+    //     }
+    // }
+    drawWall2(x, y, h, wallType, offsetWall, brightnessLevel) {
         if (!wallType)
             throw new Error('Wall type not specified');
-        const wallTexturePixel = this.fWallTextures[wallType];
+        const wallTexturePixel = this.fWallTextures[`${wallType}`];
         if (!wallTexturePixel)
             throw new Error('Texture not loaded yet');
         x = Math.floor(x);
         y = Math.floor(y);
         h = Math.floor(h);
         offsetWall = Math.floor(offsetWall);
-        let targetIndex = (this.BYTES_PER_PIXEL * this.canvas.width * y) + (this.BYTES_PER_PIXEL * x);
-        let sourceIndex = offsetWall * this.BYTES_PER_PIXEL;
-        let lastSourceIndex = sourceIndex + (this.BYTES_PER_PIXEL * wallTexturePixel.width * wallTexturePixel.height) - (wallTexturePixel.height);
-        let heightToDraw = h;
-        let yError = 0;
-        while (true) {
-            yError += h;
-            const red = Math.floor(wallTexturePixel.data[sourceIndex] * brightnessLevel);
-            const green = Math.floor(wallTexturePixel.data[sourceIndex + 1] * brightnessLevel);
-            const blue = Math.floor(wallTexturePixel.data[sourceIndex + 2] * brightnessLevel);
-            const alpha = wallTexturePixel.data[sourceIndex + 3];
-            while (yError >= this.TILE_SIZE) {
-                yError -= this.TILE_SIZE;
-                this.offscreenCanvasPixel.data[targetIndex] = red;
-                this.offscreenCanvasPixel.data[targetIndex + 1] = green;
-                this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
-                this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
-                --heightToDraw;
-                if (heightToDraw <= 0) {
-                    return;
-                }
-                targetIndex += (this.BYTES_PER_PIXEL * this.canvas.width);
-            }
-            sourceIndex += (this.BYTES_PER_PIXEL * this.TILE_SIZE);
-            if (sourceIndex > lastSourceIndex) {
-                sourceIndex = lastSourceIndex;
-            }
-        }
+        // TODO : modify the pixel with brightnessLevel
+        this.ctx.drawImage(wallTexturePixel, offsetWall, 0, 1, this.TILE_SIZE, x, y, 1, h);
     }
     drawRayCast(x, y, color) {
-        this.drawLine(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE), ((y * this.miniMapWidth) / this.TILE_SIZE), color);
+        this.drawLine2(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE), ((y * this.miniMapWidth) / this.TILE_SIZE), color);
     }
     handleKeyDownBinding() {
         window.addEventListener('keydown', (e) => {
@@ -480,6 +449,15 @@ export class GameWindow {
                 this.fKeyRight = false;
         });
     }
+    handleWindowResize() {
+        window.addEventListener('resize', () => {
+            // if(window.innerWidth > this.MAX_WIDTH) return;
+            // console.log(window.innerWidth);
+            this.resizeWindow();
+            this.recalculateAngle();
+            this.recalculateArray();
+        });
+    }
     resizeCanvas() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
@@ -487,7 +465,128 @@ export class GameWindow {
         this.offscreenCanvas.height = this.canvas.height;
         this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
-    setupWall() {
+    resizeWindow() {
+        // Take the window width and height
+        const ASPECT_W = 16;
+        const ASPECT_H = 9;
+        const w = Math.floor(window.innerWidth / this.TILE_SIZE) * this.TILE_SIZE;
+        let h = (w / ASPECT_W) * ASPECT_H;
+        h = Math.min(h, 636);
+        this.canvas.width = w;
+        this.canvas.height = h;
+        this.WIDTH = w;
+        this.HEIGHT = h;
+        this.HALF_WIDTH = Math.floor(w / 2);
+        this.HALF_HEIGHT = Math.floor(h / 2);
+        this.offscreenCanvas = new OffscreenCanvas(w, h);
+        const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
+        if (!canvasBufferCtx)
+            throw new Error('No context found');
+        this.offscreenCanvasContext = canvasBufferCtx;
+        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+    }
+    recalculateAngle() {
+        this.ANGLE_60_DEG = this.WIDTH;
+        this.ANGLE_30_DEG = Math.floor(this.ANGLE_60_DEG / 2);
+        this.ANGLE_2_DEG = Math.floor(this.ANGLE_30_DEG / 15);
+        this.ANGLE_3_DEG = Math.floor(this.ANGLE_30_DEG / 10);
+        this.ANGLE_4_DEG = Math.floor(this.ANGLE_60_DEG / 15);
+        this.ANGLE_5_DEG = Math.floor(this.ANGLE_30_DEG / 6);
+        this.ANGLE_10_DEG = Math.floor(this.ANGLE_5_DEG * 2);
+        this.ANGLE_90_DEG = Math.floor(this.ANGLE_30_DEG * 3);
+        this.ANGLE_180_DEG = Math.floor(this.ANGLE_60_DEG * 3);
+        this.ANGLE_270_DEG = Math.floor(this.ANGLE_30_DEG * 9);
+        this.ANGLE_360_DEG = Math.floor(this.ANGLE_60_DEG * 6);
+        this.ANGLE_0_DEG = 0;
+    }
+    recalculateArray() {
+        this.fSinArray = new Array(this.ANGLE_360_DEG + 1);
+        this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
+        this.fTanArray = new Array(this.ANGLE_360_DEG + 1);
+        this.fISinArray = new Array(this.ANGLE_360_DEG + 1);
+        this.fCosArray = new Array(this.ANGLE_360_DEG + 1);
+        this.fITanArray = new Array(this.ANGLE_360_DEG + 1);
+        this.fFishTable = new Array(this.ANGLE_60_DEG + 1);
+        this.fXStepTable = new Array(this.ANGLE_360_DEG + 1);
+        this.fYStepTable = new Array(this.ANGLE_360_DEG + 1);
+        this.fDiagonalDistanceWall = new Array(this.WIDTH);
+        for (let i = 0; i <= this.ANGLE_360_DEG; ++i) {
+            // TODO : 
+            const rad = this.degToRad(i) + (0.0001);
+            // const rad = this.degToRad(i)
+            this.fSinArray[i] = Math.sin(rad);
+            this.fCosArray[i] = Math.cos(rad);
+            this.fTanArray[i] = Math.tan(rad);
+            this.fISinArray[i] = 1.0 / this.fSinArray[i];
+            this.fICosArray[i] = 1.0 / this.fCosArray[i];
+            this.fITanArray[i] = 1.0 / this.fTanArray[i];
+            if (i >= this.ANGLE_90_DEG && i < this.ANGLE_270_DEG) {
+                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
+                if (this.fXStepTable[i] > 0) {
+                    this.fXStepTable[i] = -this.fXStepTable[i];
+                }
+            }
+            else {
+                this.fXStepTable[i] = this.TILE_SIZE / this.fTanArray[i];
+                if (this.fXStepTable[i] < 0) {
+                    this.fXStepTable[i] = -this.fXStepTable[i];
+                }
+            }
+            if (i >= this.ANGLE_0_DEG && i < this.ANGLE_180_DEG) {
+                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
+                if (this.fYStepTable[i] < 0) {
+                    this.fYStepTable[i] = -this.fYStepTable[i];
+                }
+            }
+            else {
+                this.fYStepTable[i] = this.fTanArray[i] * this.TILE_SIZE;
+                if (this.fYStepTable[i] > 0) {
+                    this.fYStepTable[i] = -this.fYStepTable[i];
+                }
+            }
+        }
+        for (let i = -this.ANGLE_30_DEG; i <= this.ANGLE_30_DEG; ++i) {
+            const rad = this.degToRad(i);
+            this.fFishTable[i + this.ANGLE_30_DEG] = 1.0 / Math.cos(rad);
+        }
+        this.fPlayerDistToProjectionPlane = Math.floor((this.HALF_WIDTH) / this.fTanArray[this.ANGLE_30_DEG]);
+        for (let i = 0; i < this.fDiagonalDistanceWall.length; ++i) {
+            this.fDiagonalDistanceWall[i] = new Array(this.HALF_HEIGHT);
+        }
+        for (let i = 0; i < this.WIDTH; ++i) {
+            for (let j = this.HALF_HEIGHT; j < this.HEIGHT; ++j) {
+                let sub = j - this.HALF_HEIGHT;
+                let ratio = (this.fPlayerHeight) / sub;
+                let diagonalDistance = (Math.floor(this.fPlayerDistToProjectionPlane * ratio)) * (this.fFishTable[i]);
+                this.fDiagonalDistanceWall[i][j] = diagonalDistance;
+            }
+        }
+        // Recalculate Offset
+        this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2);
+    }
+    // setupWall() {
+    //     return Promise.all(
+    //         [1, 2, 3, 4].map((el: number) => {
+    //             return new Promise(res => {
+    //                 const img = new Image(64, 64)
+    //                 img.src = `assets/walls/wall${el}.jpg`
+    //                 img.crossOrigin = "Anonymous"
+    //                 img.onload = () => {
+    //                     const c = document.createElement('canvas')
+    //                     c.getContext('2d')?.drawImage(img, 0, 0)
+    //                     this.fWallTextures[`${el}`] = c.getContext('2d')!.getImageData(0, 0, 64, 64);
+    //                     return res(null)
+    //                 }
+    //             })
+    //         })
+    //     )
+    //     // ['1', '2', '3', '4'].forEach((el: string) => {
+    //     //     const img = document.createElement('img')
+    //     //     img.src = `./assets/walls/wall${el}.jpg`
+    //     //     this.images[el] = img
+    //     // });
+    // }
+    setupWall2() {
         return Promise.all([1, 2, 3, 4].map((el) => {
             return new Promise(res => {
                 const img = new Image(64, 64);
@@ -497,16 +596,11 @@ export class GameWindow {
                     var _a;
                     const c = document.createElement('canvas');
                     (_a = c.getContext('2d')) === null || _a === void 0 ? void 0 : _a.drawImage(img, 0, 0);
-                    this.fWallTextures[`${el}`] = c.getContext('2d').getImageData(0, 0, 64, 64);
+                    this.fWallTextures[`${el}`] = c;
                     return res(null);
                 };
             });
         }));
-        // ['1', '2', '3', '4'].forEach((el: string) => {
-        //     const img = document.createElement('img')
-        //     img.src = `./assets/walls/wall${el}.jpg`
-        //     this.images[el] = img
-        // });
     }
     setupFloor() {
         return new Promise((res, rej) => {
@@ -528,23 +622,14 @@ export class GameWindow {
         let c = 70;
         let i = 0;
         for (i = 0; i < this.HEIGHT / 2; ++i) {
-            this.drawFilledRect(0 + this.windowOffset, i, this.WIDTH, 1, { red: 247, green: c, blue: 25, alpha: 255 });
+            this.drawFilledRect2(0 + this.windowOffset, i, this.WIDTH, 1, { red: 247, green: c, blue: 25, alpha: 255 });
             c = Math.min(c + 0.25, 145);
         }
         c = 22;
         for (; i < this.HEIGHT; ++i) {
-            this.drawFilledRect(0 + this.windowOffset, i, this.WIDTH, 1, { red: c, green: 20, blue: 20, alpha: 255 });
+            this.drawFilledRect2(0 + this.windowOffset, i, this.WIDTH, 1, { red: c, green: 20, blue: 20, alpha: 255 });
             c = Math.min(c + 1, 200);
         }
-    }
-    calculateFPS() {
-        let currentTimeStamp = Date.now();
-        ++this.tickCount;
-        if (this.tickCount > 59) {
-            this.currentFPS = Math.floor(1000 / (currentTimeStamp - this.currentTimeStamp));
-            this.tickCount = 0;
-        }
-        this.currentTimeStamp = currentTimeStamp;
     }
     degToRad(deg) {
         return (deg * Math.PI) / this.ANGLE_180_DEG;
@@ -566,7 +651,7 @@ export class GameWindow {
                 }
                 else {
                 }
-                this.drawFilledRect(col * this.miniMapWidth, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth, color);
+                this.drawFilledRect2(col * this.miniMapWidth, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth, color);
             }
         }
     }
@@ -576,7 +661,7 @@ export class GameWindow {
     }
     drawPlayerPositionOnMap() {
         const dist = 20;
-        this.drawLine(Math.floor(this.fPlayerMapX), Math.floor(this.fPlayerMapY), Math.floor(this.fPlayerMapX + (this.fCosArray[this.fPlayerDeg] * dist)), Math.floor(this.fPlayerMapY + (this.fSinArray[this.fPlayerDeg] * dist)), { red: 0, green: 0, blue: 255, alpha: 255 });
+        this.drawLine2(Math.floor(this.fPlayerMapX), Math.floor(this.fPlayerMapY), Math.floor(this.fPlayerMapX + (this.fCosArray[this.fPlayerDeg] * dist)), Math.floor(this.fPlayerMapY + (this.fSinArray[this.fPlayerDeg] * dist)), { red: 0, green: 0, blue: 255, alpha: 255 });
     }
     drawFilledRect(x, y, width, height, color) {
         let targetIndex = (this.offscreenCanvas.width * this.BYTES_PER_PIXEL * y) + (this.BYTES_PER_PIXEL * x);
@@ -591,10 +676,12 @@ export class GameWindow {
             // targetIndex += this.BYTES_PER_PIXEL
             targetIndex += ((this.offscreenCanvas.width - width) * this.BYTES_PER_PIXEL);
         }
-        /// this.ctx.beginPath()
-        /// this.ctx.fillStyle = color
-        /// this.ctx.fillRect(x, y, width, height)
-        /// this.ctx.fill()
+    }
+    drawFilledRect2(x, y, width, height, color) {
+        this.ctx.beginPath();
+        this.ctx.fillStyle = rgbToString(color);
+        this.ctx.fillRect(x, y, width, height);
+        this.ctx.fill();
     }
     drawLine(startX, startY, endX, endY, color) {
         let targetIndex = (this.BYTES_PER_PIXEL * this.offscreenCanvas.width * startY) + (startX * this.BYTES_PER_PIXEL);
@@ -652,12 +739,14 @@ export class GameWindow {
                 }
             }
         }
-        // this.ctx.beginPath()
-        // this.ctx.lineWidth = 2
-        // this.ctx.strokeStyle = color
-        // this.ctx.moveTo(startX, startY)
-        // this.ctx.lineTo(endX, endY)
-        // this.ctx.stroke()
+    }
+    drawLine2(startX, startY, endX, endY, color) {
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = rgbToString(color);
+        this.ctx.moveTo(startX, startY);
+        this.ctx.lineTo(endX, endY);
+        this.ctx.stroke();
     }
     drawCircle(x, y, radius, color) {
         this.ctx.beginPath();

@@ -137,9 +137,9 @@ export class GameWindow {
             // this.resetCanvasBuffer()
             // this.resizeWindow()
             this.drawBackground()
-            this.drawMap()
             this.updatePlayerMapPosition()
             this.raycast()
+            this.drawMap()
             this.drawPlayerPositionOnMap()
             // this.paintCanvasBuffer()
 
@@ -342,12 +342,12 @@ export class GameWindow {
                 distToNextWall = distToNextVerticalWall
                 offsetWall = yIntersection % this.TILE_SIZE
                 wallType = wallTypeVertical
-                this.drawRayCast(verticalGridPosition, yIntersection, LIME_GREEN)
+                // this.drawRayCast(verticalGridPosition, yIntersection, LIME_GREEN)
             } else {
                 distToNextWall = distToNextHorizontalWall
                 offsetWall = xIntersection % this.TILE_SIZE
                 wallType = wallTypeHorizontal
-                this.drawRayCast(xIntersection, horizontalGridPosition, LIME_GREEN)
+                // this.drawRayCast(xIntersection, horizontalGridPosition, LIME_GREEN)
             }
 
             // Compute the height based on the distance of the ray
