@@ -7,16 +7,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { GRAY, rgbToString, WHITESMOKE } from "./constant.js";
+import { GRAY, WHITESMOKE } from "./constant.js";
 // let debug = false;
 export class GameWindow {
     constructor(canvas) {
         this.canvas = canvas;
         this.canvasPixel = null;
-        this.WIDTH = 0;
-        this.HEIGHT = 0;
-        this.HALF_WIDTH = 0;
-        this.HALF_HEIGHT = 0;
+        this.WIDTH = 576;
+        this.HEIGHT = 288;
+        this.HALF_WIDTH = this.WIDTH / 2;
+        this.HALF_HEIGHT = this.HEIGHT / 2;
         this.MAX_WIDTH = 1024;
         this.BYTES_PER_PIXEL = 4;
         this.offscreenCanvas = new OffscreenCanvas(10, 10);
@@ -32,7 +32,7 @@ export class GameWindow {
         this.mapWidth = 12;
         this.mapHeight = 12;
         this.windowOffset = 0;
-        this.miniMapWidth = 16;
+        this.miniMapWidth = 8;
         this.TILE_SIZE = 64;
         // Wall
         this.fWallTextures = {};
@@ -78,18 +78,20 @@ export class GameWindow {
         this.ctx = this.canvas.getContext('bitmaprenderer');
         this.frameRate = 60;
         this.fpsInterval = Math.floor(1000 / this.frameRate);
-        // this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height)
-        // const canvasBufferCtx = this.offscreenCanvas.getContext('2d')
-        // if (!canvasBufferCtx) throw new Error('No context found')
-        // this.offscreenCanvasContext = canvasBufferCtx
-        // this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, canvas.width, canvas.height)
+        this.canvas.width = this.WIDTH;
+        this.canvas.height = this.HEIGHT;
+        this.offscreenCanvas = new OffscreenCanvas(this.WIDTH, this.HEIGHT);
+        const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
+        if (!canvasBufferCtx)
+            throw new Error('No context found');
+        this.offscreenCanvasContext = canvasBufferCtx;
+        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
     start() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.setup();
             this.handleKeyUpBinding();
             this.handleKeyDownBinding();
-            this.handleWindowResize();
             this.thenTimeStamp = Date.now();
             this.startTime = this.thenTimeStamp;
             requestAnimationFrame(this.update.bind(this));
@@ -97,11 +99,8 @@ export class GameWindow {
     }
     setup() {
         return __awaiter(this, void 0, void 0, function* () {
-            // this.resizeCanvas2()
-            this.resizeWindow();
             this.recalculateAngle();
             this.recalculateArray();
-            // await this.setupWall()
             yield this.setupWall();
             yield this.setupFloor();
             const map = "111111111111" +
@@ -443,40 +442,6 @@ export class GameWindow {
                 this.fKeyRight = false;
         });
     }
-    handleWindowResize() {
-        window.addEventListener('resize', () => {
-            this.resizeWindow();
-            this.recalculateAngle();
-            this.recalculateArray();
-        });
-    }
-    resizeCanvas() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.offscreenCanvas.width = this.canvas.width;
-        this.offscreenCanvas.height = this.canvas.height;
-        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
-    }
-    resizeWindow() {
-        // Take the window width and height
-        const ASPECT_W = 16;
-        const ASPECT_H = 9;
-        const w = Math.floor(window.innerWidth / this.TILE_SIZE) * this.TILE_SIZE;
-        let h = (w / ASPECT_W) * ASPECT_H;
-        h = Math.min(h, 636);
-        this.canvas.width = w;
-        this.canvas.height = h;
-        this.WIDTH = w;
-        this.HEIGHT = h;
-        this.HALF_WIDTH = Math.floor(w / 2);
-        this.HALF_HEIGHT = Math.floor(h / 2);
-        this.offscreenCanvas = new OffscreenCanvas(w, h);
-        const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
-        if (!canvasBufferCtx)
-            throw new Error('No context found');
-        this.offscreenCanvasContext = canvasBufferCtx;
-        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
-    }
     recalculateAngle() {
         this.ANGLE_60_DEG = this.WIDTH;
         this.ANGLE_30_DEG = Math.floor(this.ANGLE_60_DEG / 2);
@@ -614,9 +579,9 @@ export class GameWindow {
     drawFPS() {
         this.offscreenCanvasContext.beginPath();
         this.offscreenCanvasContext.fillStyle = 'black';
-        this.offscreenCanvasContext.font = "20px serif";
-        const windowOffsetRight = Math.floor(this.canvas.width / 2 + this.WIDTH / 2) - 100;
-        this.offscreenCanvasContext.fillText("FPS : " + this.currentFPS, windowOffsetRight, 20);
+        this.offscreenCanvasContext.font = "18px Mono";
+        const windowOffsetRight = Math.floor(this.canvas.width / 2 + this.WIDTH / 2) - 80;
+        this.offscreenCanvasContext.fillText("FPS: " + this.currentFPS, windowOffsetRight, 20);
     }
     drawMap() {
         for (let row = 0; row < this.mapHeight; ++row) {
@@ -637,7 +602,7 @@ export class GameWindow {
         this.fPlayerMapY = this.fPlayerY / this.TILE_SIZE * this.miniMapWidth;
     }
     drawPlayerPositionOnMap() {
-        const dist = 20;
+        const dist = 8;
         this.drawLine(Math.floor(this.fPlayerMapX), Math.floor(this.fPlayerMapY), Math.floor(this.fPlayerMapX + (this.fCosArray[this.fPlayerDeg] * dist)), Math.floor(this.fPlayerMapY + (this.fSinArray[this.fPlayerDeg] * dist)), { red: 0, green: 0, blue: 255, alpha: 255 });
     }
     drawFilledRect(x, y, width, height, color) {
@@ -653,12 +618,6 @@ export class GameWindow {
             // targetIndex += this.BYTES_PER_PIXEL
             targetIndex += ((this.offscreenCanvas.width - width) * this.BYTES_PER_PIXEL);
         }
-    }
-    drawFilledRect2(x, y, width, height, color) {
-        this.offscreenCanvasContext.beginPath();
-        this.offscreenCanvasContext.fillStyle = rgbToString(color);
-        this.offscreenCanvasContext.fillRect(x, y, width, height);
-        this.offscreenCanvasContext.fill();
     }
     drawLine(startX, startY, endX, endY, color) {
         let targetIndex = (this.BYTES_PER_PIXEL * this.offscreenCanvas.width * startY) + (startX * this.BYTES_PER_PIXEL);
@@ -716,13 +675,5 @@ export class GameWindow {
                 }
             }
         }
-    }
-    drawLine2(startX, startY, endX, endY, color) {
-        this.offscreenCanvasContext.beginPath();
-        this.offscreenCanvasContext.lineWidth = 2;
-        this.offscreenCanvasContext.strokeStyle = rgbToString(color);
-        this.offscreenCanvasContext.moveTo(startX, startY);
-        this.offscreenCanvasContext.lineTo(endX, endY);
-        this.offscreenCanvasContext.stroke();
     }
 }

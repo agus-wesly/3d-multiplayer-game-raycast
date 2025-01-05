@@ -1,14 +1,14 @@
-import { GRAY, RGB, rgbToString, WHITESMOKE } from "./constant.js"
+import { GRAY, RGB, WHITESMOKE } from "./constant.js"
 // let debug = false;
 export class GameWindow {
     // Canvas
     // ctx: CanvasRenderingContext2D;
     ctx: ImageBitmapRenderingContext;
     canvasPixel: ImageData | null = null;
-    WIDTH: number = 0;
-    HEIGHT: number = 0;
-    HALF_WIDTH: number = 0;
-    HALF_HEIGHT: number = 0;
+    WIDTH: number = 576;
+    HEIGHT: number = 288;
+    HALF_WIDTH: number = this.WIDTH / 2;
+    HALF_HEIGHT: number = this.HEIGHT / 2;
     MAX_WIDTH: number = 1024;
 
     readonly BYTES_PER_PIXEL = 4;
@@ -30,7 +30,7 @@ export class GameWindow {
     mapWidth = 12;
     mapHeight = 12;
     windowOffset: number = 0;
-    miniMapWidth: number = 16;
+    miniMapWidth: number = 8;
 
     TILE_SIZE: number = 64;
 
@@ -89,28 +89,27 @@ export class GameWindow {
         this.frameRate = 60
         this.fpsInterval = Math.floor(1000 / this.frameRate);
 
-        // this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height)
-        // const canvasBufferCtx = this.offscreenCanvas.getContext('2d')
-        // if (!canvasBufferCtx) throw new Error('No context found')
-        // this.offscreenCanvasContext = canvasBufferCtx
-        // this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, canvas.width, canvas.height)
+        this.canvas.width = this.WIDTH;
+        this.canvas.height = this.HEIGHT;
+
+        this.offscreenCanvas = new OffscreenCanvas(this.WIDTH, this.HEIGHT);
+        const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
+        if (!canvasBufferCtx) throw new Error('No context found');
+        this.offscreenCanvasContext = canvasBufferCtx;
+        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
     async start() {
         await this.setup()
         this.handleKeyUpBinding()
         this.handleKeyDownBinding()
-        this.handleWindowResize()
 
         this.thenTimeStamp = Date.now();
         this.startTime = this.thenTimeStamp;
         requestAnimationFrame(this.update.bind(this))
     }
     async setup() {
-        // this.resizeCanvas2()
-        this.resizeWindow()
         this.recalculateAngle()
         this.recalculateArray()
-        // await this.setupWall()
         await this.setupWall()
         await this.setupFloor()
 
@@ -483,43 +482,6 @@ export class GameWindow {
             else if (e.key === 'd') this.fKeyRight = false
         })
     }
-    handleWindowResize() {
-        window.addEventListener('resize', () => {
-            this.resizeWindow();
-            this.recalculateAngle();
-            this.recalculateArray();
-        })
-
-    }
-    resizeCanvas() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.offscreenCanvas.width = this.canvas.width
-        this.offscreenCanvas.height = this.canvas.height
-        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height)
-    }
-    resizeWindow() {
-        // Take the window width and height
-        const ASPECT_W = 16;
-        const ASPECT_H = 9;
-
-        const w = Math.floor(window.innerWidth / this.TILE_SIZE) * this.TILE_SIZE;
-        let h = (w / ASPECT_W) * ASPECT_H;
-        h = Math.min(h, 636);
-
-        this.canvas.width = w;
-        this.canvas.height = h;
-        this.WIDTH = w;
-        this.HEIGHT = h;
-        this.HALF_WIDTH = Math.floor(w / 2);
-        this.HALF_HEIGHT = Math.floor(h / 2);
-
-        this.offscreenCanvas = new OffscreenCanvas(w, h);
-        const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
-        if (!canvasBufferCtx) throw new Error('No context found');
-        this.offscreenCanvasContext = canvasBufferCtx;
-        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
-    }
     recalculateAngle() {
         this.ANGLE_60_DEG = this.WIDTH;
         this.ANGLE_30_DEG = Math.floor(this.ANGLE_60_DEG / 2);
@@ -662,10 +624,10 @@ export class GameWindow {
     }
     drawFPS() {
         this.offscreenCanvasContext.beginPath()
-        this.offscreenCanvasContext.fillStyle = 'black'
-        this.offscreenCanvasContext.font = "20px serif";
-        const windowOffsetRight = Math.floor(this.canvas.width / 2 + this.WIDTH / 2) - 100
-        this.offscreenCanvasContext.fillText("FPS : " + this.currentFPS, windowOffsetRight, 20)
+        this.offscreenCanvasContext.fillStyle = 'black';
+        this.offscreenCanvasContext.font = "18px Mono";
+        const windowOffsetRight = Math.floor(this.canvas.width / 2 + this.WIDTH / 2) - 80;
+        this.offscreenCanvasContext.fillText("FPS: " + this.currentFPS, windowOffsetRight, 20);
     }
     drawMap() {
         for (let row = 0; row < this.mapHeight; ++row) {
@@ -685,7 +647,7 @@ export class GameWindow {
         this.fPlayerMapY = this.fPlayerY / this.TILE_SIZE * this.miniMapWidth
     }
     drawPlayerPositionOnMap() {
-        const dist = 20;
+        const dist = 8;
         this.drawLine(
             Math.floor(this.fPlayerMapX),
             Math.floor(this.fPlayerMapY),
@@ -708,12 +670,6 @@ export class GameWindow {
             // targetIndex += this.BYTES_PER_PIXEL
             targetIndex += ((this.offscreenCanvas.width - width) * this.BYTES_PER_PIXEL)
         }
-    }
-    drawFilledRect2(x: number, y: number, width: number, height: number, color: RGB) {
-        this.offscreenCanvasContext.beginPath();
-        this.offscreenCanvasContext.fillStyle = rgbToString(color);
-        this.offscreenCanvasContext.fillRect(x, y, width, height);
-        this.offscreenCanvasContext.fill();
     }
     drawLine(startX: number, startY: number, endX: number, endY: number, color: RGB) {
         let targetIndex = (this.BYTES_PER_PIXEL * this.offscreenCanvas.width * startY) + (startX * this.BYTES_PER_PIXEL)
@@ -779,15 +735,6 @@ export class GameWindow {
 
     }
 
-    drawLine2(startX: number, startY: number, endX: number, endY: number, color: RGB) {
-        this.offscreenCanvasContext.beginPath();
-        this.offscreenCanvasContext.lineWidth = 2;
-        this.offscreenCanvasContext.strokeStyle = rgbToString(color);
-        this.offscreenCanvasContext.moveTo(startX, startY);
-        this.offscreenCanvasContext.lineTo(endX, endY);
-        this.offscreenCanvasContext.stroke();
-    }
-
     // drawCircle(x: number, y: number, radius: number, color: string) {
     //     this.ctx.beginPath()
     //     this.ctx.fillStyle = color
@@ -795,6 +742,3 @@ export class GameWindow {
     //     this.ctx.fill()
     // }
 }
-
-
-
