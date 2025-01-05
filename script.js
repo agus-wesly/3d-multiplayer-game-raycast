@@ -12,12 +12,16 @@ import { GRAY, rgbToString, WHITESMOKE } from "./constant.js";
 export class GameWindow {
     constructor(canvas) {
         this.canvas = canvas;
+        this.canvasPixel = null;
         this.WIDTH = 0;
         this.HEIGHT = 0;
         this.HALF_WIDTH = 0;
         this.HALF_HEIGHT = 0;
         this.MAX_WIDTH = 1024;
         this.BYTES_PER_PIXEL = 4;
+        this.offscreenCanvas = new OffscreenCanvas(10, 10);
+        this.offscreenCanvasContext = this.offscreenCanvas.getContext('2d');
+        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
         this.currentFPS = 0;
         this.startTime = 0;
         this.frameCount = 0;
@@ -70,7 +74,8 @@ export class GameWindow {
         this.fPlayerMapY = 0;
         this.fPlayerDistToProjectionPlane = 0;
         this.fPlayerHeight = 30;
-        this.ctx = this.canvas.getContext('2d');
+        // this.ctx = this.canvas.getContext('2d')!
+        this.ctx = this.canvas.getContext('bitmaprenderer');
         this.frameRate = 60;
         this.fpsInterval = Math.floor(1000 / this.frameRate);
         // this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height)
@@ -97,7 +102,7 @@ export class GameWindow {
             this.recalculateAngle();
             this.recalculateArray();
             // await this.setupWall()
-            yield this.setupWall2();
+            yield this.setupWall();
             yield this.setupFloor();
             const map = "111111111111" +
                 "100000000001" +
@@ -122,28 +127,27 @@ export class GameWindow {
         if (interval > this.fpsInterval) {
             // if (true) {
             this.thenTimeStamp = this.nowTimeStamp - (interval % this.fpsInterval);
-            // this.resetCanvasBuffer()
-            // this.resizeWindow()
+            this.clearOffscreenCanvas();
             this.drawBackground();
             this.updatePlayerMapPosition();
             this.raycast();
             this.drawMap();
             this.drawPlayerPositionOnMap();
-            // this.paintCanvasBuffer()
             this.rotatePlayerPosition();
             this.movePlayerPosition();
-            this.drawFPS();
+            this.drawOffscreenCanvas();
             const sinceStart = this.nowTimeStamp - this.startTime;
             this.currentFPS = Math.floor(1000 / (sinceStart / ++this.frameCount) * 100 / 100);
         }
     }
-    resetCanvasBuffer() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    clearOffscreenCanvas() {
+        this.offscreenCanvasContext.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
-    paintCanvasBuffer() {
+    drawOffscreenCanvas() {
         this.offscreenCanvasContext.putImageData(this.offscreenCanvasPixel, 0, 0);
+        this.drawFPS();
         const imageBitMap = this.offscreenCanvas.transferToImageBitmap();
-        this.ctx.drawImage(imageBitMap, 0, 0);
+        this.ctx.transferFromImageBitmap(imageBitMap);
     }
     movePlayerPosition() {
         const maxWallDistance = 30;
@@ -319,22 +323,23 @@ export class GameWindow {
                 distToNextWall = distToNextVerticalWall;
                 offsetWall = yIntersection % this.TILE_SIZE;
                 wallType = wallTypeVertical;
-                // this.drawRayCast(verticalGridPosition, yIntersection, LIME_GREEN)
             }
             else {
                 distToNextWall = distToNextHorizontalWall;
                 offsetWall = xIntersection % this.TILE_SIZE;
                 wallType = wallTypeHorizontal;
-                // this.drawRayCast(xIntersection, horizontalGridPosition, LIME_GREEN)
             }
             // Compute the height based on the distance of the ray
             distToNextWall /= this.fFishTable[currentColumn];
             const wallHeight = this.fPlayerDistToProjectionPlane * this.TILE_SIZE / distToNextWall;
             let topWall = this.HALF_HEIGHT - (wallHeight / 2);
             let bottomWall = this.HALF_HEIGHT + (wallHeight / 2);
+            if (!this.fFloorTextureCanvas) {
+                throw new Error('No texture canvas');
+            }
+            this.drawFloor(bottomWall, currentColumn, curDeg);
             distToNextWall = Math.floor(distToNextWall);
-            this.drawWall2(currentColumn + this.windowOffset, topWall, (bottomWall - topWall), wallType, offsetWall, 120 / distToNextWall);
-            // this.drawFloor(bottomWall, currentColumn, curDeg);
+            this.drawWall(currentColumn + this.windowOffset, topWall, (bottomWall - topWall), wallType, offsetWall, 120 / distToNextWall);
             curDeg += 1;
             if (curDeg >= this.ANGLE_360_DEG)
                 curDeg = curDeg - this.ANGLE_360_DEG;
@@ -358,7 +363,7 @@ export class GameWindow {
             let offsetFloorX = Math.floor(xEnd % this.TILE_SIZE);
             let offsetFloorY = Math.floor(yEnd % this.TILE_SIZE);
             let sourceIndex = (offsetFloorY * this.BYTES_PER_PIXEL * this.TILE_SIZE) + (offsetFloorX * this.BYTES_PER_PIXEL);
-            if (!this.fFloorTexturePixel)
+            if (!this.fFloorTexturePixel || !this.fFloorTextureCanvas)
                 throw new Error('not loaded yet');
             let brightness = (120 / diagonalDistance);
             const red = this.fFloorTexturePixel.data[sourceIndex] * brightness;
@@ -372,58 +377,47 @@ export class GameWindow {
             targetIndex += (this.BYTES_PER_PIXEL * this.offscreenCanvas.width);
         }
     }
-    // drawWall(x: number, y: number, h: number, wallType: string | undefined, offsetWall: number, brightnessLevel: number) {
-    //     if (!wallType) throw new Error('Wall type not specified')
-    //     const wallTexturePixel = this.fWallTextures[wallType]
-    //     if (!wallTexturePixel) throw new Error('Texture not loaded yet')
-    //     x = Math.floor(x)
-    //     y = Math.floor(y)
-    //     h = Math.floor(h)
-    //     offsetWall = Math.floor(offsetWall)
-    //     let targetIndex = (this.BYTES_PER_PIXEL * this.canvas.width * y) + (this.BYTES_PER_PIXEL * x)
-    //     let sourceIndex = offsetWall * this.BYTES_PER_PIXEL
-    //     let lastSourceIndex = sourceIndex + (this.BYTES_PER_PIXEL * wallTexturePixel.width * wallTexturePixel.height) - (wallTexturePixel.height)
-    //     let heightToDraw = h
-    //     let yError = 0
-    //     while (true) {
-    //         yError += h
-    //         const red = Math.floor(wallTexturePixel.data[sourceIndex] * brightnessLevel)
-    //         const green = Math.floor(wallTexturePixel.data[sourceIndex + 1] * brightnessLevel)
-    //         const blue = Math.floor(wallTexturePixel.data[sourceIndex + 2] * brightnessLevel)
-    //         const alpha = wallTexturePixel.data[sourceIndex + 3]
-    //         while (yError >= this.TILE_SIZE) {
-    //             yError -= this.TILE_SIZE
-    //             this.offscreenCanvasPixel.data[targetIndex] = red;
-    //             this.offscreenCanvasPixel.data[targetIndex + 1] = green;
-    //             this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
-    //             this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
-    //             --heightToDraw;
-    //             if (heightToDraw <= 0) {
-    //                 return;
-    //             }
-    //             targetIndex += (this.BYTES_PER_PIXEL * this.canvas.width)
-    //         }
-    //         sourceIndex += (this.BYTES_PER_PIXEL * this.TILE_SIZE)
-    //         if (sourceIndex > lastSourceIndex) {
-    //             sourceIndex = lastSourceIndex
-    //         }
-    //     }
-    // }
-    drawWall2(x, y, h, wallType, offsetWall, brightnessLevel) {
+    drawWall(x, y, h, wallType, offsetWall, brightnessLevel) {
         if (!wallType)
             throw new Error('Wall type not specified');
-        const wallTexturePixel = this.fWallTextures[`${wallType}`];
+        const wallTexturePixel = this.fWallTextures[wallType];
         if (!wallTexturePixel)
             throw new Error('Texture not loaded yet');
         x = Math.floor(x);
         y = Math.floor(y);
         h = Math.floor(h);
         offsetWall = Math.floor(offsetWall);
-        // TODO : modify the pixel with brightnessLevel
-        this.ctx.drawImage(wallTexturePixel, offsetWall, 0, 1, this.TILE_SIZE, x, y, 1, h);
+        let targetIndex = (this.BYTES_PER_PIXEL * this.canvas.width * y) + (this.BYTES_PER_PIXEL * x);
+        let sourceIndex = offsetWall * this.BYTES_PER_PIXEL;
+        let lastSourceIndex = sourceIndex + (this.BYTES_PER_PIXEL * wallTexturePixel.canvas.width * wallTexturePixel.canvas.height) - (wallTexturePixel.canvas.height);
+        let heightToDraw = h;
+        let yError = 0;
+        while (true) {
+            yError += h;
+            const red = Math.floor(wallTexturePixel.pixel.data[sourceIndex] * brightnessLevel);
+            const green = Math.floor(wallTexturePixel.pixel.data[sourceIndex + 1] * brightnessLevel);
+            const blue = Math.floor(wallTexturePixel.pixel.data[sourceIndex + 2] * brightnessLevel);
+            const alpha = wallTexturePixel.pixel.data[sourceIndex + 3];
+            while (yError >= this.TILE_SIZE) {
+                yError -= this.TILE_SIZE;
+                this.offscreenCanvasPixel.data[targetIndex] = red;
+                this.offscreenCanvasPixel.data[targetIndex + 1] = green;
+                this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
+                this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
+                --heightToDraw;
+                if (heightToDraw <= 0) {
+                    return;
+                }
+                targetIndex += (this.BYTES_PER_PIXEL * this.canvas.width);
+            }
+            sourceIndex += (this.BYTES_PER_PIXEL * this.TILE_SIZE);
+            if (sourceIndex > lastSourceIndex) {
+                sourceIndex = lastSourceIndex;
+            }
+        }
     }
     drawRayCast(x, y, color) {
-        this.drawLine2(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE), ((y * this.miniMapWidth) / this.TILE_SIZE), color);
+        this.drawLine(this.fPlayerMapX, this.fPlayerMapY, ((x * this.miniMapWidth) / this.TILE_SIZE), ((y * this.miniMapWidth) / this.TILE_SIZE), color);
     }
     handleKeyDownBinding() {
         window.addEventListener('keydown', (e) => {
@@ -451,8 +445,6 @@ export class GameWindow {
     }
     handleWindowResize() {
         window.addEventListener('resize', () => {
-            // if(window.innerWidth > this.MAX_WIDTH) return;
-            // console.log(window.innerWidth);
             this.resizeWindow();
             this.recalculateAngle();
             this.recalculateArray();
@@ -564,39 +556,23 @@ export class GameWindow {
         // Recalculate Offset
         this.windowOffset = Math.floor(this.canvas.width / 2 - this.WIDTH / 2);
     }
-    // setupWall() {
-    //     return Promise.all(
-    //         [1, 2, 3, 4].map((el: number) => {
-    //             return new Promise(res => {
-    //                 const img = new Image(64, 64)
-    //                 img.src = `assets/walls/wall${el}.jpg`
-    //                 img.crossOrigin = "Anonymous"
-    //                 img.onload = () => {
-    //                     const c = document.createElement('canvas')
-    //                     c.getContext('2d')?.drawImage(img, 0, 0)
-    //                     this.fWallTextures[`${el}`] = c.getContext('2d')!.getImageData(0, 0, 64, 64);
-    //                     return res(null)
-    //                 }
-    //             })
-    //         })
-    //     )
-    //     // ['1', '2', '3', '4'].forEach((el: string) => {
-    //     //     const img = document.createElement('img')
-    //     //     img.src = `./assets/walls/wall${el}.jpg`
-    //     //     this.images[el] = img
-    //     // });
-    // }
-    setupWall2() {
+    setupWall() {
         return Promise.all([1, 2, 3, 4].map((el) => {
-            return new Promise(res => {
+            return new Promise((res, rej) => {
                 const img = new Image(64, 64);
                 img.src = `assets/walls/wall${el}.jpg`;
                 img.crossOrigin = "Anonymous";
                 img.onload = () => {
-                    var _a;
                     const c = document.createElement('canvas');
-                    (_a = c.getContext('2d')) === null || _a === void 0 ? void 0 : _a.drawImage(img, 0, 0);
-                    this.fWallTextures[`${el}`] = c;
+                    const ctx = c.getContext('2d');
+                    if (!ctx)
+                        throw rej("No context");
+                    ctx.drawImage(img, 0, 0);
+                    const x = {
+                        canvas: c,
+                        pixel: ctx.getImageData(0, 0, 64, 64),
+                    };
+                    this.fWallTextures[`${el}`] = x;
                     return res(null);
                 };
             });
@@ -614,6 +590,7 @@ export class GameWindow {
                     throw rej('Setup floor');
                 x.drawImage(img, 0, 0);
                 this.fFloorTexturePixel = x.getImageData(0, 0, 64, 64);
+                this.fFloorTextureCanvas = c;
                 res(null);
             };
         });
@@ -622,12 +599,12 @@ export class GameWindow {
         let c = 70;
         let i = 0;
         for (i = 0; i < this.HEIGHT / 2; ++i) {
-            this.drawFilledRect2(0 + this.windowOffset, i, this.WIDTH, 1, { red: 247, green: c, blue: 25, alpha: 255 });
+            this.drawFilledRect(0 + this.windowOffset, i, this.WIDTH, 1, { red: 247, green: c, blue: 25, alpha: 255 });
             c = Math.min(c + 0.25, 145);
         }
         c = 22;
         for (; i < this.HEIGHT; ++i) {
-            this.drawFilledRect2(0 + this.windowOffset, i, this.WIDTH, 1, { red: c, green: 20, blue: 20, alpha: 255 });
+            this.drawFilledRect(0 + this.windowOffset, i, this.WIDTH, 1, { red: c, green: 20, blue: 20, alpha: 255 });
             c = Math.min(c + 1, 200);
         }
     }
@@ -635,11 +612,11 @@ export class GameWindow {
         return (deg * Math.PI) / this.ANGLE_180_DEG;
     }
     drawFPS() {
-        this.ctx.beginPath();
-        this.ctx.fillStyle = 'black';
-        this.ctx.font = "20px serif";
+        this.offscreenCanvasContext.beginPath();
+        this.offscreenCanvasContext.fillStyle = 'black';
+        this.offscreenCanvasContext.font = "20px serif";
         const windowOffsetRight = Math.floor(this.canvas.width / 2 + this.WIDTH / 2) - 100;
-        this.ctx.fillText("FPS : " + this.currentFPS, windowOffsetRight, 20);
+        this.offscreenCanvasContext.fillText("FPS : " + this.currentFPS, windowOffsetRight, 20);
     }
     drawMap() {
         for (let row = 0; row < this.mapHeight; ++row) {
@@ -651,7 +628,7 @@ export class GameWindow {
                 }
                 else {
                 }
-                this.drawFilledRect2(col * this.miniMapWidth, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth, color);
+                this.drawFilledRect(col * this.miniMapWidth, row * this.miniMapWidth, this.miniMapWidth, this.miniMapWidth, color);
             }
         }
     }
@@ -661,7 +638,7 @@ export class GameWindow {
     }
     drawPlayerPositionOnMap() {
         const dist = 20;
-        this.drawLine2(Math.floor(this.fPlayerMapX), Math.floor(this.fPlayerMapY), Math.floor(this.fPlayerMapX + (this.fCosArray[this.fPlayerDeg] * dist)), Math.floor(this.fPlayerMapY + (this.fSinArray[this.fPlayerDeg] * dist)), { red: 0, green: 0, blue: 255, alpha: 255 });
+        this.drawLine(Math.floor(this.fPlayerMapX), Math.floor(this.fPlayerMapY), Math.floor(this.fPlayerMapX + (this.fCosArray[this.fPlayerDeg] * dist)), Math.floor(this.fPlayerMapY + (this.fSinArray[this.fPlayerDeg] * dist)), { red: 0, green: 0, blue: 255, alpha: 255 });
     }
     drawFilledRect(x, y, width, height, color) {
         let targetIndex = (this.offscreenCanvas.width * this.BYTES_PER_PIXEL * y) + (this.BYTES_PER_PIXEL * x);
@@ -678,10 +655,10 @@ export class GameWindow {
         }
     }
     drawFilledRect2(x, y, width, height, color) {
-        this.ctx.beginPath();
-        this.ctx.fillStyle = rgbToString(color);
-        this.ctx.fillRect(x, y, width, height);
-        this.ctx.fill();
+        this.offscreenCanvasContext.beginPath();
+        this.offscreenCanvasContext.fillStyle = rgbToString(color);
+        this.offscreenCanvasContext.fillRect(x, y, width, height);
+        this.offscreenCanvasContext.fill();
     }
     drawLine(startX, startY, endX, endY, color) {
         let targetIndex = (this.BYTES_PER_PIXEL * this.offscreenCanvas.width * startY) + (startX * this.BYTES_PER_PIXEL);
@@ -741,17 +718,11 @@ export class GameWindow {
         }
     }
     drawLine2(startX, startY, endX, endY, color) {
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeStyle = rgbToString(color);
-        this.ctx.moveTo(startX, startY);
-        this.ctx.lineTo(endX, endY);
-        this.ctx.stroke();
-    }
-    drawCircle(x, y, radius, color) {
-        this.ctx.beginPath();
-        this.ctx.fillStyle = color;
-        this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
-        this.ctx.fill();
+        this.offscreenCanvasContext.beginPath();
+        this.offscreenCanvasContext.lineWidth = 2;
+        this.offscreenCanvasContext.strokeStyle = rgbToString(color);
+        this.offscreenCanvasContext.moveTo(startX, startY);
+        this.offscreenCanvasContext.lineTo(endX, endY);
+        this.offscreenCanvasContext.stroke();
     }
 }
