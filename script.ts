@@ -1,8 +1,9 @@
-import { GRAY, LIME_GREEN, RGB, rgbToString, WHITESMOKE } from "./constant.js"
+import { GRAY, RGB, rgbToString, WHITESMOKE } from "./constant.js"
 // let debug = false;
 export class GameWindow {
     // Canvas
     ctx: CanvasRenderingContext2D;
+    canvasPixel: ImageData | null = null;
     WIDTH: number = 0;
     HEIGHT: number = 0;
     HALF_WIDTH: number = 0;
@@ -10,9 +11,9 @@ export class GameWindow {
     MAX_WIDTH: number = 1024;
 
     readonly BYTES_PER_PIXEL = 4;
-    offscreenCanvas: OffscreenCanvas;
-    offscreenCanvasContext: OffscreenCanvasRenderingContext2D;
-    offscreenCanvasPixel: ImageData;
+    offscreenCanvas: OffscreenCanvas = new OffscreenCanvas(10, 10);
+    offscreenCanvasContext: OffscreenCanvasRenderingContext2D = this.offscreenCanvas.getContext('2d')!;
+    offscreenCanvasPixel: ImageData = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
 
     // FPS
     frameRate: number;
@@ -33,11 +34,12 @@ export class GameWindow {
     TILE_SIZE: number = 64;
 
     // Wall
-    fWallTextures: Record<string, HTMLCanvasElement> = {};
+    fWallTextures: Record<string, { canvas: HTMLCanvasElement; pixel: ImageData }> = {};
     fDiagonalDistanceWall: Array<Array<number>> = [];
 
     // Floor
     fFloorTexturePixel: ImageData | undefined;
+    fFloorTextureCanvas: HTMLCanvasElement | undefined;
 
     // Angle
     ANGLE_60_DEG: number = 0;
@@ -134,14 +136,14 @@ export class GameWindow {
             // if (true) {
             this.thenTimeStamp = this.nowTimeStamp - (interval % this.fpsInterval);
 
-            // this.resetCanvasBuffer()
-            // this.resizeWindow()
+            this.clearOffscreenCanvas()
             this.drawBackground()
             this.updatePlayerMapPosition()
+            this.drawOffscreenCanvas()
             this.raycast()
             this.drawMap()
             this.drawPlayerPositionOnMap()
-            // this.paintCanvasBuffer()
+
 
             this.rotatePlayerPosition()
             this.movePlayerPosition()
@@ -151,10 +153,10 @@ export class GameWindow {
             this.currentFPS = Math.floor(1000 / (sinceStart / ++this.frameCount) * 100 / 100);
         }
     }
-    resetCanvasBuffer() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    clearOffscreenCanvas() {
+        this.offscreenCanvasContext.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
-    paintCanvasBuffer() {
+    drawOffscreenCanvas() {
         this.offscreenCanvasContext.putImageData(this.offscreenCanvasPixel, 0, 0);
         const imageBitMap = this.offscreenCanvas.transferToImageBitmap();
         this.ctx.drawImage(imageBitMap, 0, 0);
@@ -350,11 +352,19 @@ export class GameWindow {
                 // this.drawRayCast(xIntersection, horizontalGridPosition, LIME_GREEN)
             }
 
+            
+
             // Compute the height based on the distance of the ray
             distToNextWall /= this.fFishTable[currentColumn]
             const wallHeight = this.fPlayerDistToProjectionPlane * this.TILE_SIZE / distToNextWall
             let topWall = this.HALF_HEIGHT - (wallHeight / 2)
             let bottomWall = this.HALF_HEIGHT + (wallHeight / 2)
+
+            if (!this.fFloorTextureCanvas) {
+                throw new Error('No texture canvas');
+            }
+            this.drawFloor(bottomWall, currentColumn, curDeg);
+
             distToNextWall = Math.floor(distToNextWall)
             this.drawWall2(
                 currentColumn + this.windowOffset,
@@ -365,7 +375,6 @@ export class GameWindow {
                 120 / distToNextWall
             )
 
-            // this.drawFloor(bottomWall, currentColumn, curDeg);
 
             curDeg += 1;
             if (curDeg >= this.ANGLE_360_DEG) curDeg = curDeg - this.ANGLE_360_DEG
@@ -397,7 +406,8 @@ export class GameWindow {
             let offsetFloorY = Math.floor(yEnd % this.TILE_SIZE);
             let sourceIndex = (offsetFloorY * this.BYTES_PER_PIXEL * this.TILE_SIZE) + (offsetFloorX * this.BYTES_PER_PIXEL);
 
-            if (!this.fFloorTexturePixel) throw new Error('not loaded yet');
+            if (!this.fFloorTexturePixel || !this.fFloorTextureCanvas) throw new Error('not loaded yet');
+
 
             let brightness = (120 / diagonalDistance)
             const red = this.fFloorTexturePixel.data[sourceIndex] * brightness
@@ -409,6 +419,7 @@ export class GameWindow {
             this.offscreenCanvasPixel.data[targetIndex + 1] = green;
             this.offscreenCanvasPixel.data[targetIndex + 2] = blue
             this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
+
 
             targetIndex += (this.BYTES_PER_PIXEL * this.offscreenCanvas.width)
         }
@@ -458,6 +469,7 @@ export class GameWindow {
 
     drawWall2(x: number, y: number, h: number, wallType: string | undefined, offsetWall: number, brightnessLevel: number) {
         if (!wallType) throw new Error('Wall type not specified');
+        if (!this.canvasPixel) throw new Error('No canvas pixel');
         const wallTexturePixel = this.fWallTextures[`${wallType}`];
         if (!wallTexturePixel) throw new Error('Texture not loaded yet');
         x = Math.floor(x);
@@ -465,9 +477,8 @@ export class GameWindow {
         h = Math.floor(h);
         offsetWall = Math.floor(offsetWall);
 
-        // TODO : modify the pixel with brightnessLevel
         this.ctx.drawImage(
-            wallTexturePixel,
+            wallTexturePixel.canvas,
             offsetWall,
             0,
             1,
@@ -521,9 +532,9 @@ export class GameWindow {
         const ASPECT_W = 16;
         const ASPECT_H = 9;
 
-        const w = Math.floor(window.innerWidth/this.TILE_SIZE) * this.TILE_SIZE;
+        const w = Math.floor(window.innerWidth / this.TILE_SIZE) * this.TILE_SIZE;
         let h = (w / ASPECT_W) * ASPECT_H;
-        h = Math.min(h,636);
+        h = Math.min(h, 636);
 
         this.canvas.width = w;
         this.canvas.height = h;
@@ -536,6 +547,7 @@ export class GameWindow {
         const canvasBufferCtx = this.offscreenCanvas.getContext('2d');
         if (!canvasBufferCtx) throw new Error('No context found');
         this.offscreenCanvasContext = canvasBufferCtx;
+        this.canvasPixel = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
     recalculateAngle() {
@@ -648,15 +660,21 @@ export class GameWindow {
     setupWall2() {
         return Promise.all(
             [1, 2, 3, 4].map((el: number) => {
-                return new Promise(res => {
+                return new Promise((res, rej) => {
                     const img = new Image(64, 64)
                     img.src = `assets/walls/wall${el}.jpg`
                     img.crossOrigin = "Anonymous"
                     img.onload = () => {
                         const c = document.createElement('canvas')
-                        c.getContext('2d')?.drawImage(img, 0, 0)
-                        this.fWallTextures[`${el}`] = c;
-                        return res(null)
+                        const ctx = c.getContext('2d');
+                        if (!ctx) throw rej("No context");
+                        ctx.drawImage(img, 0, 0);
+                        const x = {
+                            canvas: c,
+                            pixel: ctx.getImageData(0, 0, 64, 64),
+                        };
+                        this.fWallTextures[`${el}`] = x;
+                        return res(null);
                     }
                 })
             })
@@ -673,6 +691,7 @@ export class GameWindow {
                 if (!x) throw rej('Setup floor')
                 x.drawImage(img, 0, 0)
                 this.fFloorTexturePixel = x.getImageData(0, 0, 64, 64)
+                this.fFloorTextureCanvas = c;
                 res(null)
             }
         })
