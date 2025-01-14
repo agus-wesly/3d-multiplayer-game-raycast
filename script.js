@@ -13,8 +13,8 @@ export class GameWindow {
     constructor(canvas) {
         this.canvas = canvas;
         this.canvasPixel = null;
-        this.WIDTH = 320;
-        this.HEIGHT = 200;
+        this.WIDTH = 576;
+        this.HEIGHT = 228;
         this.HALF_WIDTH = this.WIDTH / 2;
         this.HALF_HEIGHT = this.HEIGHT / 2;
         this.MAX_WIDTH = 1024;
@@ -132,7 +132,7 @@ export class GameWindow {
             // if (true) {
             this.thenTimeStamp = this.nowTimeStamp - (interval % this.fpsInterval);
             this.clearOffscreenCanvas();
-            // this.drawBackground()
+            this.drawBackground();
             this.updatePlayerMapPosition();
             this.raycast();
             // this.drawMap()
@@ -146,11 +146,6 @@ export class GameWindow {
     }
     clearOffscreenCanvas() {
         this.offscreenCanvasContext.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
-        // TODO : Draw background
-        if (!this.fCeilTextureImage)
-            throw new Error("BG image not loaded yet");
-        this.offscreenCanvasContext.drawImage(this.fCeilTextureImage, 0, 0, this.WIDTH - this.fCeilDeg, this.HEIGHT, this.fCeilDeg, 0, this.WIDTH - this.fCeilDeg, this.HEIGHT);
-        this.offscreenCanvasPixel = this.offscreenCanvasContext.getImageData(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
     }
     drawOffscreenCanvas() {
         this.offscreenCanvasContext.putImageData(this.offscreenCanvasPixel, 0, 0);
@@ -211,27 +206,16 @@ export class GameWindow {
         }
     }
     rotatePlayerPosition() {
-        let fPlayerDelta = 0;
         if (this.fKeyLeft) {
-            fPlayerDelta = -this.ANGLE_4_DEG;
             this.fPlayerDeg -= this.ANGLE_4_DEG;
             if (this.fPlayerDeg < 0)
                 this.fPlayerDeg += this.ANGLE_360_DEG;
         }
         if (this.fKeyRight) {
-            fPlayerDelta = this.ANGLE_4_DEG;
             this.fPlayerDeg += this.ANGLE_4_DEG;
             if (this.fPlayerDeg > this.ANGLE_360_DEG) {
                 this.fPlayerDeg -= this.ANGLE_360_DEG;
             }
-        }
-        // TODO : Update backgroundDeg
-        this.fCeilDeg = this.fCeilDeg - fPlayerDelta;
-        if (this.fCeilDeg < -this.WIDTH * 2) {
-            this.fCeilDeg = (this.WIDTH * 2) + this.fCeilDeg;
-        }
-        else if (this.fCeilDeg > 0) {
-            this.fCeilDeg = -(this.fCeilTextureImage.width - this.WIDTH - (this.fCeilDeg));
         }
     }
     raycast() {
@@ -366,41 +350,7 @@ export class GameWindow {
                 curDeg = curDeg - this.ANGLE_360_DEG;
         }
     }
-    calculateXCeilPixel(curDeg) {
-        if (!this.fCeilTexturePixel || !this.fCeilTextureCanvas)
-            throw new Error('Ceil not loaded yet');
-        // let this.fCeilTextureWidth = 864;
-        curDeg = Math.floor(curDeg);
-        let v = Math.floor(curDeg / this.fCeilTextureWidth);
-        let m = curDeg % this.fCeilTextureWidth;
-        if (v % 2 === 0) {
-            // even
-            return m;
-        }
-        else {
-            // odd
-            return this.fCeilTextureWidth - ((curDeg % this.fCeilTextureWidth) + 1);
-        }
-    }
     drawCeil(topWall, currentColumn, curDeg) {
-        if (!this.fCeilTexturePixel || !this.fCeilTextureCanvas)
-            throw new Error('Ceil not loaded yet');
-        topWall = Math.floor(topWall);
-        let targetIndex = ((currentColumn + this.windowOffset) * this.BYTES_PER_PIXEL);
-        for (let curDist = 0; curDist < topWall; ++curDist) {
-            let xSource = this.calculateXCeilPixel(curDeg);
-            let ySource = curDist + 32;
-            let sourceIndex = (ySource * this.BYTES_PER_PIXEL * this.fCeilTexturePixel.width) + (xSource * this.BYTES_PER_PIXEL);
-            const red = this.fCeilTexturePixel.data[sourceIndex];
-            const green = this.fCeilTexturePixel.data[sourceIndex + 1];
-            const blue = this.fCeilTexturePixel.data[sourceIndex + 2];
-            const alpha = this.fCeilTexturePixel.data[sourceIndex + 3];
-            this.offscreenCanvasPixel.data[targetIndex] = red;
-            this.offscreenCanvasPixel.data[targetIndex + 1] = green;
-            this.offscreenCanvasPixel.data[targetIndex + 2] = blue;
-            this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
-            targetIndex += this.BYTES_PER_PIXEL * this.offscreenCanvasPixel.width;
-        }
     }
     drawFloor(bottomWall, currentColumn, curDeg) {
         bottomWall = Math.floor(bottomWall);
@@ -633,7 +583,6 @@ export class GameWindow {
                     throw rej('Setup floor');
                 x.drawImage(img, 0, 0);
                 this.fCeilTexturePixel = x.getImageData(0, 0, w, h);
-                this.fCeilTextureCanvas = c;
                 this.fCeilTextureWidth = (this.WIDTH * 6) / (Math.ceil(this.WIDTH * 6 / this.fCeilTexturePixel.width));
                 res(null);
             };
@@ -642,9 +591,8 @@ export class GameWindow {
     setupBackground2() {
         return new Promise((res) => {
             const img = new Image();
-            img.src = `/assets/other/bgr.png`;
+            img.src = `/assets/other/bg3.png`;
             img.crossOrigin = "Anonymous";
-            this.fCeilTextureImage = img;
             img.onload = () => {
                 res(null);
             };
