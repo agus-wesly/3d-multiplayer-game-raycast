@@ -40,6 +40,7 @@ export class GameWindow {
 
     // Ceil
     fCeilTexturePixel: ImageData | undefined;
+    fCeilTextureCanvas: HTMLCanvasElement | undefined;
     fCeilTextureWidth: number = 0;
     fCeilDeg: number = 0;
 
@@ -120,7 +121,7 @@ export class GameWindow {
         await this.setupWall()
         await this.setupFloor()
         // await this.setupBackground()
-        await this.setupBackground2()
+        await this.setupCeil()
 
         const map =
             "111111111111" +
@@ -370,7 +371,7 @@ export class GameWindow {
             if (!this.fFloorTextureCanvas) {
                 throw new Error('No texture canvas');
             }
-            // this.drawCeil(topWall, currentColumn, curDeg);
+            this.drawCeil(topWall, currentColumn, curDeg);
             this.drawFloor(bottomWall, currentColumn, curDeg);
 
             distToNextWall = Math.floor(distToNextWall)
@@ -389,10 +390,6 @@ export class GameWindow {
         }
     }
 
-    drawCeil(topWall: number, currentColumn: number, curDeg: number) {
-    }
-
-
     drawFloor(bottomWall: number, currentColumn: number, curDeg: number) {
         bottomWall = Math.floor(bottomWall);
         let targetIndex =
@@ -400,7 +397,8 @@ export class GameWindow {
             + ((currentColumn + this.windowOffset) * this.BYTES_PER_PIXEL);
 
         for (let curDist = bottomWall; curDist < this.HEIGHT; ++curDist) {
-            let diagonalDistance = this.fDiagonalDistanceWall[currentColumn][curDist];
+            let sub = curDist - this.HALF_HEIGHT;
+            let diagonalDistance = this.fDiagonalDistanceWall[currentColumn][sub];
             let xEnd = diagonalDistance * this.fCosArray[curDeg]
             let yEnd = diagonalDistance * this.fSinArray[curDeg]
 
@@ -420,7 +418,6 @@ export class GameWindow {
 
             if (!this.fFloorTexturePixel || !this.fFloorTextureCanvas) throw new Error('not loaded yet');
 
-
             let brightness = (120 / diagonalDistance)
             const red = this.fFloorTexturePixel.data[sourceIndex] * brightness
             const green = this.fFloorTexturePixel.data[sourceIndex + 1] * brightness;
@@ -432,8 +429,52 @@ export class GameWindow {
             this.offscreenCanvasPixel.data[targetIndex + 2] = blue
             this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
 
-
             targetIndex += (this.BYTES_PER_PIXEL * this.offscreenCanvas.width)
+        }
+    }
+
+    drawCeil(topWall: number, currentColumn: number, curDeg: number) {
+        topWall = Math.floor(topWall);
+        let targetIndex =
+            (topWall * this.BYTES_PER_PIXEL * this.offscreenCanvas.width)
+            + ((currentColumn + this.windowOffset) * this.BYTES_PER_PIXEL);
+
+        for (let curDist = topWall; curDist > 0; --curDist) {
+            let sub = this.HALF_HEIGHT - curDist;
+            // let diagonalDistance = (Math.floor(this.fPlayerDistToProjectionPlane * ratio)) * (this.fFishTable[currentColumn]);
+            let diagonalDistance = this.fDiagonalDistanceWall[currentColumn][sub];
+
+            let xEnd = diagonalDistance * this.fCosArray[curDeg]
+            let yEnd = diagonalDistance * this.fSinArray[curDeg]
+
+            xEnd += this.fPlayerX;
+            yEnd += this.fPlayerY;
+
+            let xPos = Math.floor(xEnd / this.TILE_SIZE)
+            let yPos = Math.floor(yEnd / this.TILE_SIZE)
+
+            if (xPos < 0 || yPos < 0 || xPos > this.mapWidth || yPos > this.mapHeight) {
+                break;
+            }
+
+            let offsetFloorX = Math.floor(xEnd % this.TILE_SIZE);
+            let offsetFloorY = Math.floor(yEnd % this.TILE_SIZE);
+            let sourceIndex = (offsetFloorY * this.BYTES_PER_PIXEL * this.TILE_SIZE) + (offsetFloorX * this.BYTES_PER_PIXEL);
+
+            if (!this.fCeilTexturePixel || !this.fCeilTextureCanvas) throw new Error('not loaded yet');
+
+            let brightness = (120 / diagonalDistance)
+            const red = this.fCeilTexturePixel.data[sourceIndex] * brightness
+            const green = this.fCeilTexturePixel.data[sourceIndex + 1] * brightness;
+            const blue = this.fCeilTexturePixel.data[sourceIndex + 2] * brightness;
+            const alpha = this.fCeilTexturePixel.data[sourceIndex + 3];
+
+            this.offscreenCanvasPixel.data[targetIndex] = red;
+            this.offscreenCanvasPixel.data[targetIndex + 1] = green;
+            this.offscreenCanvasPixel.data[targetIndex + 2] = blue
+            this.offscreenCanvasPixel.data[targetIndex + 3] = alpha;
+
+            targetIndex -= (this.BYTES_PER_PIXEL * this.offscreenCanvas.width)
         }
     }
 
@@ -572,10 +613,10 @@ export class GameWindow {
         }
         for (let i = 0; i < this.WIDTH; ++i) {
             for (let j = this.HALF_HEIGHT; j < this.HEIGHT; ++j) {
-                let sub = j - this.HALF_HEIGHT;
+                let sub = Math.abs(j - this.HALF_HEIGHT);
                 let ratio = (this.fPlayerHeight) / sub;
                 let diagonalDistance = (Math.floor(this.fPlayerDistToProjectionPlane * ratio)) * (this.fFishTable[i]);
-                this.fDiagonalDistanceWall[i][j] = diagonalDistance;
+                this.fDiagonalDistanceWall[i][sub] = diagonalDistance;
 
             }
         }
@@ -642,12 +683,17 @@ export class GameWindow {
             }
         })
     }
-    setupBackground2() {
+    setupCeil() {
         return new Promise((res) => {
             const img = new Image();
-            img.src = `/assets/other/bg3.png`;
+            img.src = `./assets/ceil/ceil.png`;
             img.crossOrigin = "Anonymous";
             img.onload = () => {
+                this.fCeilTextureCanvas = document.createElement('canvas');
+                this.fCeilTextureCanvas.width = img.width;
+                this.fCeilTextureCanvas.height = img.height;
+                this.fCeilTextureCanvas.getContext('2d')!.drawImage(img, 0, 0);
+                this.fCeilTexturePixel = this.fCeilTextureCanvas.getContext('2d')!.getImageData(0, 0, img.width, img.height);
                 res(null);
             }
         })
